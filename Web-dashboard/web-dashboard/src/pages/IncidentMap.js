@@ -19,8 +19,11 @@ const IncidentMap = () => {
   const [selectedIncident, setSelectedIncident] = useState(null);
   
   // Initialize map
-  const { map, resizeMap } = useMap('incidents-map', mapMarkers, { zoom: 10 });
-  
+  const { map, resizeMap } = useMap('incidents-map', mapMarkers, {
+  zoom: 15,
+  center: [6.6745, -1.5713], // KNUST coordinates
+});
+
   // Fetch incident data
   useEffect(() => {
     // Calculate date filter based on timeframe

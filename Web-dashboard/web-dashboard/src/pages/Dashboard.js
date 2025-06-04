@@ -14,19 +14,20 @@ const Dashboard = () => {
     incidentStats,
     isLoading, 
     error, 
-    fetchIncidents,
-    fetchIncidentStats
+    fetchIncidents
   } = useIncidents();
   const [mapMarkers, setMapMarkers] = useState([]);
   
   // Initialize map
-  const { map, resizeMap } = useMap('dashboard-map', mapMarkers, { zoom: 12 });
+  const { map, resizeMap } = useMap('dashboard-map', mapMarkers, { zoom: 12,
+    center: [6.6745, -1.5713],
+   });
   
   // Fetch incident data
   useEffect(() => {
     fetchIncidents({ limit: 10, sort: 'timestamp,desc' });
-    fetchIncidentStats();
-  }, [fetchIncidents, fetchIncidentStats]);
+    // fetchIncidentStats();
+  }, [fetchIncidents]);
   
   // Update map markers when incidents change
   useEffect(() => {
@@ -106,7 +107,7 @@ const Dashboard = () => {
         </div>
         <button className="btn btn-primary" onClick={() => {
           fetchIncidents({ limit: 10, sort: 'timestamp,desc' });
-          fetchIncidentStats();
+          // fetchIncidentStats();
         }}>
           <i className="material-icons">refresh</i>
           <span>Retry</span>

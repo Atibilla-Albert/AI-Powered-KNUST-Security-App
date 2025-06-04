@@ -11,6 +11,9 @@ export const IncidentProvider = ({ children }) => {
   const [selectedIncident, setSelectedIncident] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+
   const [filters, setFilters] = useState({
     status: 'all',
     priority: 'all',
@@ -36,28 +39,58 @@ export const IncidentProvider = ({ children }) => {
   }, [isAuthenticated, filters]);
 
   // Fetch incidents based on current filters
-  const fetchIncidents = async () => {
-    if (!isAuthenticated) return;
+  // const fetchIncidents = async () => {
+  //   if (!isAuthenticated) return;
 
-    setLoading(true);
-    try {
-      const response = await incidentService.getIncidents(filters);
-      setIncidents(response.incidents || []);
-      setStats(response.stats || {
-        new: 0,
-        inProgress: 0,
-        resolved: 0,
-        high: 0,
-        medium: 0,
-        low: 0
-      });
-    } catch (err) {
-      setError(err.message || 'Failed to fetch incidents');
-      console.error('Error fetching incidents:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
+  //   setLoading(true);
+  //   try {
+  //     const response = await incidentService.getIncidents(filters);
+  //     setIncidents(response.incidents || []);
+  //     setStats(response.stats || {
+  //       new: 0,
+  //       inProgress: 0,
+  //       resolved: 0,
+  //       high: 0,
+  //       medium: 0,
+  //       low: 0
+  //     });
+  //   } catch (err) {
+  //     setError(err.message || 'Failed to fetch incidents');
+  //     console.error('Error fetching incidents:', err);
+  //   } finally {
+  //     setLoading(false);
+  //   }
+  // };
+const fetchIncidents = async () => {
+  if (!isAuthenticated) return;
+
+  setLoading(true);
+  try {
+    // 🔧 Hardcoded mock incident for development
+    const mockData = [
+      {
+        id: "INC20250603-001",
+        type: "Suspicious Person",
+        location: { name: "Engineering Block A" },
+        timestamp: "2025-06-03T10:45:00Z",
+        status: "New",
+        priority: "High",
+        assignedTo: "USR12345",
+        assignedToUser: {
+          name: "Officer Jane Doe",
+          photoUrl: "https://i.pravatar.cc/150?img=12"
+        }
+      }
+    ];
+
+    setIncidents(mockData);
+    setStats({ new: 1, inProgress: 0, resolved: 0, high: 1, medium: 0, low: 0 });
+  } catch (err) {
+    setError('Failed to load mock data');
+  } finally {
+    setLoading(false);
+  }
+};
 
   // Get incident by ID
   const getIncidentById = async (incidentId) => {
@@ -239,7 +272,11 @@ export const IncidentProvider = ({ children }) => {
     assignIncident,
     fetchIncidentStats,
     changeIncidentStatus,
-    addIncidentResponse
+    addIncidentResponse,
+    currentPage,          // ✅ add this
+    setCurrentPage,       // ✅ add this
+    pageSize,             // ✅ and this
+    setPageSize           // ✅ and this
   };
 
   return <IncidentContext.Provider value={value}>{children}</IncidentContext.Provider>;
