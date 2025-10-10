@@ -1,0 +1,225 @@
+/* === IncidentAdminPanel.css === */
+
+.admin-tab {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 20px;
+}
+
+.response-section {
+  margin-top: 40px;
+  background-color: #fff;
+  padding: 24px 28px;
+  border-radius: 12px;
+  border: 1px solid #e0e0e0;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
+}
+
+.response-section h3 {
+  margin-bottom: 24px;
+  font-size: 1.4rem;
+  font-weight: 600;
+  color: #2c3e50;
+}
+
+.admin-controls {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 24px;
+}
+
+.admin-controls div {
+  display: flex;
+  flex-direction: column;
+}
+
+.admin-controls label {
+  margin-bottom: 8px;
+  font-size: 0.95rem;
+  color: #555;
+  font-weight: 500;
+}
+
+textarea,
+input[type="text"],
+select {
+  padding: 12px 14px;
+  font-size: 1rem;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  background-color: #fafafa;
+  transition: border 0.2s ease;
+}
+
+textarea:focus,
+input[type="text"]:focus,
+select:focus {
+  outline: none;
+  border-color: #1976d2;
+  background-color: #fff;
+}
+
+textarea {
+  resize: vertical;
+  min-height: 120px;
+}
+
+.button-group {
+  margin-top: 12px;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.button-group button,
+.admin-btn {
+  padding: 10px 18px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+  color: #fff;
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.08);
+}
+
+.admin-btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 14px rgba(0,0,0,0.12);
+}
+
+.admin-btn:active:not(:disabled) {
+  transform: translateY(0);
+  box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+}
+
+.admin-btn:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+/* Color variants */
+.admin-btn-primary { background: linear-gradient(135deg, #1976d2, #1565c0); }
+.admin-btn-primary:hover { background: linear-gradient(135deg, #1e88e5, #1976d2); }
+
+.admin-btn-secondary { background: linear-gradient(135deg, #6c757d, #5a6268); }
+.admin-btn-secondary:hover { background: linear-gradient(135deg, #7a848b, #6c757d); }
+
+.admin-btn-success { background: linear-gradient(135deg, #2e7d32, #1b5e20); }
+.admin-btn-success:hover { background: linear-gradient(135deg, #388e3c, #2e7d32); }
+
+/* Department select styling */
+.department-select {
+  padding: 12px 14px;
+  font-size: 1rem;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  background-color: #fafafa;
+  transition: border 0.2s ease;
+  width: 100%;
+  max-width: 400px;
+}
+
+.department-select:focus {
+  outline: none;
+  border-color: #1976d2;
+  background-color: #fff;
+  box-shadow: 0 0 0 3px rgba(25, 118, 210, 0.1);
+}
+
+/* Current assignment section */
+.current-assignment {
+  background-color: #f8f9fa;
+  border: 1px solid #e9ecef;
+  border-radius: 8px;
+  padding: 16px;
+  margin-top: 12px;
+}
+
+.current-assignment p {
+  margin: 8px 0;
+  font-size: 0.95rem;
+  color: #495057;
+}
+
+.current-assignment strong {
+  color: #2c3e50;
+  font-weight: 600;
+}
+
+/* Admin sections spacing */
+.admin-section {
+  margin-bottom: 24px;
+  padding: 20px;
+  background-color: #fff;
+  border-radius: 8px;
+  border: 1px solid #e0e0e0;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+  max-width: 600px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.admin-section h4 {
+  margin-bottom: 16px;
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #2c3e50;
+  border-bottom: 2px solid #e9ecef;
+  padding-bottom: 8px;
+}
+
+/* Button spacing */
+.admin-section button {
+  margin-top: 12px;
+  width: 100%;
+  max-width: 200px;
+  margin-left: auto;
+  margin-right: auto;
+  display: block;
+}
+
+/* Form elements in admin sections */
+.admin-section textarea,
+.admin-section select {
+  width: 100%;
+  max-width: 400px;
+  margin: 0 auto;
+  display: block;
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+  .admin-tab {
+    padding: 10px;
+  }
+  
+  .admin-section {
+    padding: 16px;
+    margin-bottom: 16px;
+  }
+  
+  .department-select {
+    min-width: 100%;
+  }
+  
+  .admin-section textarea,
+  .admin-section select {
+    max-width: 100%;
+  }
+  
+  .admin-section button {
+    max-width: 100%;
+  }
+}
+
+@media (max-width: 480px) {
+  .admin-tab {
+    padding: 5px;
+  }
+  
+  .admin-section {
+    padding: 12px;
+  }
+}

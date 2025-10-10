@@ -1,0 +1,68 @@
+/* === App Container === */
+.app-container {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  background-color: #f8f9fa;
+  font-family: 'Roboto', sans-serif;
+}
+
+/* === Main Content Area === */
+.main-content {
+  flex: 1;
+  padding: 24px;
+  background-color: #f5f7fa;
+  overflow-y: auto;
+}
+
+/* === Auth Loading Spinner === */
+.auth-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 80vh;
+  text-align: center;
+}
+
+.auth-loading .spinner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+.spinner-border {
+  width: 32px;
+  height: 32px;
+  border: 4px solid #ccc;
+  border-top: 4px solid #1976d2;
+  border-radius: 50%;
+  animation: spin 0.6s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.auth-loading p {
+  font-size: 16px;
+  color: #666;
+}
+
+/* === Utility === */
+.page-title {
+  font-size: 24px;
+  font-weight: 600;
+  color: #333;
+  margin-bottom: 16px;
+}
+
+/* Responsive layout helper */
+@media (max-width: 768px) {
+  .main-content {
+    padding: 16px;
+  }
+}

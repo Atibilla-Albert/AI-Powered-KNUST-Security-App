@@ -1,0 +1,326 @@
+service: security-incident-reporting
+frameworkVersion: '3'
+
+custom:
+  tableName: ${self:service}-${self:provider.stage}-incidents
+  bucketName: ${self:service}-${self:provider.stage}-incident-media
+  topicName: ${self:service}-${self:provider.stage}-incident-alerts
+  userPoolName: ${self:service}-${self:provider.stage}-user-pool-v2
+  clientName: ${self:service}-${self:provider.stage}-client
+  authorizerName: ${self:service}-${self:provider.stage}-authorizer
+
+  serverless-offline:
+    httpPort: 3000
+    host: 0.0.0.0
+
+provider:
+  name: aws
+  runtime: nodejs18.x
+  region: us-east-1
+  stage: ${opt:stage, 'dev'}
+  memorySize: 512
+  timeout: 60
+  versionFunctions: false
+  tracing:
+    lambda: Active
+
+  environment:
+    DYNAMO_DB: ${self:custom.tableName}
+    S3_BUCKET: ${self:custom.bucketName}
+    SNS_TOPIC_ARN: !Ref IncidentAlertsTopic
+    COGNITO_USER_POOL_ID: us-east-1_d5YngXjKC
+    COGNITO_USER_POOL_CLIENT_ID: 72ncbq4u2avoqdmfd58likbt9e
+    STAGE: ${self:provider.stage}
+    USERS_TABLE: dev-users
+    GEOCODING_API_KEY: 702de0e1d1f74fb6b4c024d029a9f6c1
+    DEFAULT_SENDER_EMAIL: verified@email.com
+    POWERTOOLS_SERVICE_NAME: ${self:service}
+    POWERTOOLS_TRACER_CAPTURE_RESPONSE: true
+    POWERTOOLS_TRACER_CAPTURE_ERROR: true
+
+  iam:
+    role:
+      statements:
+        - Effect: Allow
+          Action:
+            - dynamodb:PutItem
+            - dynamodb:GetItem
+            - dynamodb:UpdateItem
+            - dynamodb:DeleteItem
+            - dynamodb:Query
+            - dynamodb:Scan
+          Resource:
+            - !GetAtt IncidentsTable.Arn
+            - !GetAtt UsersTable.Arn
+            - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${self:custom.tableName}/index/*"
+        - Effect: Allow
+          Action:
+            - s3:PutObject
+            - s3:GetObject
+            - s3:DeleteObject
+            - s3:ListBucket
+          Resource:
+            - !Sub "arn:aws:s3:::${self:custom.bucketName}"
+            - !Sub "arn:aws:s3:::${self:custom.bucketName}/*"
+        - Effect: Allow
+          Action:
+            - sns:Publish
+          Resource: !Ref IncidentAlertsTopic
+        - Effect: Allow
+          Action:
+            - rekognition:DetectLabels
+            - rekognition:DetectFaces
+            - sagemaker:InvokeEndpoint
+          Resource: "*"
+        - Effect: Allow
+          Action:
+            - lambda:InvokeFunction
+          Resource:
+            - !Sub "arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:security-system-fraud-assessment"
+        - Effect: Allow
+          Action:
+            - logs:CreateLogGroup
+            - logs:CreateLogStream
+            - logs:PutLogEvents
+          Resource: "*"
+
+functions:
+  api:
+    handler: index.api
+    events:
+      - http:
+          path: /{proxy+}
+          method: any
+          cors:
+            origin: "*"
+            headers:
+              - Content-Type
+              - X-Amz-Date
+              - Authorization
+              - X-Api-Key
+              - X-Amz-Security-Token
+              - X-Amz-User-Agent
+            allowCredentials: false
+          authorizer:
+            type: COGNITO_USER_POOLS
+            authorizerId: !Ref ApiGatewayAuthorizer
+            scopes:
+              - email
+              - openid
+              - profile
+
+  processHighCredibilityIncident:
+    handler: index.processHighCredibilityIncident
+    description: Processes high credibility incidents from DynamoDB stream
+    memorySize: 1024
+    timeout: 60
+    events:
+      - stream:
+          type: dynamodb
+          arn: !GetAtt IncidentsTable.StreamArn
+          batchSize: 10
+          startingPosition: LATEST
+          maximumRetryAttempts: 3
+          bisectBatchOnFunctionError: true
+
+  fraudAssessment:
+    handler: handlers/fraudDetection.handler
+    name: security-system-fraud-assessment
+    description: Performs fraud assessment for incidents
+    memorySize: 512
+    timeout: 30
+    environment:
+      POWERTOOLS_SERVICE_NAME: fraud-assessment
+      POWERTOOLS_TRACER_CAPTURE_RESPONSE: true
+      POWERTOOLS_TRACER_CAPTURE_ERROR: true
+
+plugins:
+  - serverless-offline
+
+resources:
+  Resources:
+    IncidentsTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: ${self:custom.tableName}
+        AttributeDefinitions:
+          - AttributeName: incidentId
+            AttributeType: S
+          - AttributeName: status
+            AttributeType: S
+          - AttributeName: createdAt
+            AttributeType: S
+          - AttributeName: reporterId
+            AttributeType: S
+        KeySchema:
+          - AttributeName: incidentId
+            KeyType: HASH
+        GlobalSecondaryIndexes:
+          - IndexName: StatusCreatedAtIndex
+            KeySchema:
+              - AttributeName: status
+                KeyType: HASH
+              - AttributeName: createdAt
+                KeyType: RANGE
+            Projection:
+              ProjectionType: ALL
+          - IndexName: reporterId-index
+            KeySchema:
+              - AttributeName: reporterId
+                KeyType: HASH
+            Projection:
+              ProjectionType: ALL
+        BillingMode: PAY_PER_REQUEST
+        StreamSpecification:
+          StreamViewType: NEW_IMAGE
+        SSESpecification:
+          SSEEnabled: true
+          SSEType: KMS
+          KMSMasterKeyId: arn:aws:kms:us-east-1:717279717548:key/ac1be4af-138b-45af-80e4-1e9d1b09e7c8
+        TimeToLiveSpecification:
+          AttributeName: expiresAt
+          Enabled: true
+
+    UsersTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: dev-users
+        AttributeDefinitions:
+          - AttributeName: id
+            AttributeType: S
+        KeySchema:
+          - AttributeName: id
+            KeyType: HASH
+        BillingMode: PAY_PER_REQUEST
+
+    IncidentMediaBucket:
+      Type: AWS::S3::Bucket
+      Properties:
+        BucketName: ${self:custom.bucketName}
+        AccessControl: Private
+        PublicAccessBlockConfiguration:
+          BlockPublicAcls: true
+          IgnorePublicAcls: true
+          BlockPublicPolicy: true
+          RestrictPublicBuckets: true
+        BucketEncryption:
+          ServerSideEncryptionConfiguration:
+            - ServerSideEncryptionByDefault:
+                SSEAlgorithm: AES256
+        LifecycleConfiguration:
+          Rules:
+            - Id: ExpireMediaAfter30Days
+              Status: Enabled
+              ExpirationInDays: 30
+
+    IncidentAlertsTopic:
+      Type: AWS::SNS::Topic
+      Properties:
+        TopicName: ${self:custom.topicName}
+        KmsMasterKeyId: alias/aws/sns
+
+    IncidentProcessingDLQ:
+      Type: AWS::SQS::Queue
+      Properties:
+        QueueName: ${self:service}-${self:provider.stage}-incident-processing-dlq
+        MessageRetentionPeriod: 1209600
+
+    CognitoUserPoolV2:
+      Type: AWS::Cognito::UserPool
+      Properties:
+        UserPoolName: ${self:custom.userPoolName}
+        UsernameConfiguration:
+          CaseSensitive: false
+        AutoVerifiedAttributes:
+          - email
+        Policies:
+          PasswordPolicy:
+            MinimumLength: 12
+            RequireUppercase: true
+            RequireLowercase: true
+            RequireNumbers: true
+            RequireSymbols: true
+            TemporaryPasswordValidityDays: 7
+        Schema:
+          - Name: email
+            Required: true
+            Mutable: true
+          - Name: firstName
+            AttributeDataType: String
+            Mutable: true
+            Required: false
+          - Name: lastName
+            AttributeDataType: String
+            Mutable: true
+            Required: false
+          - Name: role
+            AttributeDataType: String
+            Mutable: true
+            Required: false
+        AccountRecoverySetting:
+          RecoveryMechanisms:
+            - Name: verified_email
+              Priority: 1
+        AdminCreateUserConfig:
+          AllowAdminCreateUserOnly: false
+        DeviceConfiguration:
+          ChallengeRequiredOnNewDevice: true
+          DeviceOnlyRememberedOnUserPrompt: true
+        EmailConfiguration:
+          EmailSendingAccount: COGNITO_DEFAULT
+        UserPoolAddOns:
+          AdvancedSecurityMode: ENFORCED
+        VerificationMessageTemplate:
+          DefaultEmailOption: CONFIRM_WITH_CODE
+
+    CognitoUserPoolClient:
+      Type: AWS::Cognito::UserPoolClient
+      Properties:
+        ClientName: ${self:custom.clientName}
+        UserPoolId: !Ref CognitoUserPoolV2
+        GenerateSecret: false
+        ExplicitAuthFlows:
+          - ALLOW_USER_PASSWORD_AUTH
+          - ALLOW_REFRESH_TOKEN_AUTH
+          - ALLOW_USER_SRP_AUTH
+        PreventUserExistenceErrors: ENABLED
+        SupportedIdentityProviders:
+          - COGNITO
+        CallbackURLs:
+          - http://localhost:3000
+        LogoutURLs:
+          - http://localhost:3000/logout
+        AllowedOAuthFlows:
+          - code
+        AllowedOAuthScopes:
+          - email
+          - openid
+          - profile
+        AllowedOAuthFlowsUserPoolClient: true
+        RefreshTokenValidity: 30
+        AccessTokenValidity: 60
+        IdTokenValidity: 60
+        TokenValidityUnits:
+          AccessToken: minutes
+          IdToken: minutes
+          RefreshToken: days
+
+    ApiGatewayAuthorizer:
+      Type: AWS::ApiGateway::Authorizer
+      Properties:
+        Name: ${self:custom.authorizerName}
+        Type: COGNITO_USER_POOLS
+        IdentitySource: method.request.header.Authorization
+        RestApiId: !Ref ApiGatewayRestApi
+        ProviderARNs:
+          - !GetAtt CognitoUserPoolV2.Arn
+
+outputs:
+  CognitoUserPoolId:
+    Value: !Ref CognitoUserPoolV2
+  CognitoUserPoolClientId:
+    Value: !Ref CognitoUserPoolClient
+  ApiEndpoint:
+    Value: !Sub "https://${ApiGatewayRestApi}.execute-api.${AWS::Region}.amazonaws.com/${self:provider.stage}"
+  SnsTopicArn:
+    Value: !Ref IncidentAlertsTopic

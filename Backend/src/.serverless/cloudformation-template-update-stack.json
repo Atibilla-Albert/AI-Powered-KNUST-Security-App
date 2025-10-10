@@ -1,0 +1,933 @@
+{
+  "AWSTemplateFormatVersion": "2010-09-09",
+  "Description": "The AWS CloudFormation template for this Serverless application",
+  "Resources": {
+    "ServerlessDeploymentBucket": {
+      "Type": "AWS::S3::Bucket",
+      "Properties": {
+        "BucketEncryption": {
+          "ServerSideEncryptionConfiguration": [
+            {
+              "ServerSideEncryptionByDefault": {
+                "SSEAlgorithm": "AES256"
+              }
+            }
+          ]
+        }
+      }
+    },
+    "ServerlessDeploymentBucketPolicy": {
+      "Type": "AWS::S3::BucketPolicy",
+      "Properties": {
+        "Bucket": {
+          "Ref": "ServerlessDeploymentBucket"
+        },
+        "PolicyDocument": {
+          "Statement": [
+            {
+              "Action": "s3:*",
+              "Effect": "Deny",
+              "Principal": "*",
+              "Resource": [
+                {
+                  "Fn::Join": [
+                    "",
+                    [
+                      "arn:",
+                      {
+                        "Ref": "AWS::Partition"
+                      },
+                      ":s3:::",
+                      {
+                        "Ref": "ServerlessDeploymentBucket"
+                      },
+                      "/*"
+                    ]
+                  ]
+                },
+                {
+                  "Fn::Join": [
+                    "",
+                    [
+                      "arn:",
+                      {
+                        "Ref": "AWS::Partition"
+                      },
+                      ":s3:::",
+                      {
+                        "Ref": "ServerlessDeploymentBucket"
+                      }
+                    ]
+                  ]
+                }
+              ],
+              "Condition": {
+                "Bool": {
+                  "aws:SecureTransport": false
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    "ApiLogGroup": {
+      "Type": "AWS::Logs::LogGroup",
+      "Properties": {
+        "LogGroupName": "/aws/lambda/security-incident-reporting-dev-api"
+      }
+    },
+    "ProcessHighCredibilityIncidentLogGroup": {
+      "Type": "AWS::Logs::LogGroup",
+      "Properties": {
+        "LogGroupName": "/aws/lambda/security-incident-reporting-dev-processHighCredibilityIncident"
+      }
+    },
+    "FraudAssessmentLogGroup": {
+      "Type": "AWS::Logs::LogGroup",
+      "Properties": {
+        "LogGroupName": "/aws/lambda/security-system-fraud-assessment"
+      }
+    },
+    "IamRoleLambdaExecution": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {
+                "Service": [
+                  "lambda.amazonaws.com"
+                ]
+              },
+              "Action": [
+                "sts:AssumeRole"
+              ]
+            }
+          ]
+        },
+        "Policies": [
+          {
+            "PolicyName": {
+              "Fn::Join": [
+                "-",
+                [
+                  "security-incident-reporting",
+                  "dev",
+                  "lambda"
+                ]
+              ]
+            },
+            "PolicyDocument": {
+              "Version": "2012-10-17",
+              "Statement": [
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "logs:CreateLogStream",
+                    "logs:CreateLogGroup",
+                    "logs:TagResource"
+                  ],
+                  "Resource": [
+                    {
+                      "Fn::Sub": "arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/security-system-fraud-assessment:*"
+                    },
+                    {
+                      "Fn::Sub": "arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/security-incident-reporting-dev*:*"
+                    }
+                  ]
+                },
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "logs:PutLogEvents"
+                  ],
+                  "Resource": [
+                    {
+                      "Fn::Sub": "arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/security-system-fraud-assessment:*:*"
+                    },
+                    {
+                      "Fn::Sub": "arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/security-incident-reporting-dev*:*:*"
+                    }
+                  ]
+                },
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "dynamodb:PutItem",
+                    "dynamodb:GetItem",
+                    "dynamodb:UpdateItem",
+                    "dynamodb:DeleteItem",
+                    "dynamodb:Query",
+                    "dynamodb:Scan"
+                  ],
+                  "Resource": [
+                    {
+                      "Fn::GetAtt": [
+                        "IncidentsTable",
+                        "Arn"
+                      ]
+                    },
+                    {
+                      "Fn::GetAtt": [
+                        "UsersTable",
+                        "Arn"
+                      ]
+                    },
+                    {
+                      "Fn::Sub": "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/security-incident-reporting-dev-incidents/index/*"
+                    }
+                  ]
+                },
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "s3:PutObject",
+                    "s3:GetObject",
+                    "s3:DeleteObject",
+                    "s3:ListBucket"
+                  ],
+                  "Resource": [
+                    {
+                      "Fn::Sub": "arn:aws:s3:::security-incident-reporting-dev-incident-media"
+                    },
+                    {
+                      "Fn::Sub": "arn:aws:s3:::security-incident-reporting-dev-incident-media/*"
+                    }
+                  ]
+                },
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "sns:Publish"
+                  ],
+                  "Resource": {
+                    "Ref": "IncidentAlertsTopic"
+                  }
+                },
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "rekognition:DetectLabels",
+                    "rekognition:DetectFaces",
+                    "sagemaker:InvokeEndpoint"
+                  ],
+                  "Resource": "*"
+                },
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "lambda:InvokeFunction"
+                  ],
+                  "Resource": [
+                    {
+                      "Fn::Sub": "arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:security-system-fraud-assessment"
+                    }
+                  ]
+                },
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "logs:CreateLogGroup",
+                    "logs:CreateLogStream",
+                    "logs:PutLogEvents"
+                  ],
+                  "Resource": "*"
+                },
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "xray:PutTraceSegments",
+                    "xray:PutTelemetryRecords"
+                  ],
+                  "Resource": [
+                    "*"
+                  ]
+                },
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "dynamodb:GetRecords",
+                    "dynamodb:GetShardIterator",
+                    "dynamodb:DescribeStream",
+                    "dynamodb:ListStreams"
+                  ],
+                  "Resource": [
+                    {
+                      "Fn::GetAtt": [
+                        "IncidentsTable",
+                        "StreamArn"
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        ],
+        "Path": "/",
+        "RoleName": {
+          "Fn::Join": [
+            "-",
+            [
+              "security-incident-reporting",
+              "dev",
+              {
+                "Ref": "AWS::Region"
+              },
+              "lambdaRole"
+            ]
+          ]
+        }
+      }
+    },
+    "ApiLambdaFunction": {
+      "Type": "AWS::Lambda::Function",
+      "Properties": {
+        "Code": {
+          "S3Bucket": {
+            "Ref": "ServerlessDeploymentBucket"
+          },
+          "S3Key": "serverless/security-incident-reporting/dev/1754518141126-2025-08-06T22:09:01.126Z/security-incident-reporting.zip"
+        },
+        "Handler": "index.api",
+        "Runtime": "nodejs18.x",
+        "FunctionName": "security-incident-reporting-dev-api",
+        "MemorySize": 512,
+        "Timeout": 60,
+        "TracingConfig": {
+          "Mode": "Active"
+        },
+        "Environment": {
+          "Variables": {
+            "DYNAMO_DB": "security-incident-reporting-dev-incidents",
+            "S3_BUCKET": "security-incident-reporting-dev-incident-media",
+            "SNS_TOPIC_ARN": {
+              "Ref": "IncidentAlertsTopic"
+            },
+            "COGNITO_USER_POOL_ID": "us-east-1_d5YngXjKC",
+            "COGNITO_USER_POOL_CLIENT_ID": "72ncbq4u2avoqdmfd58likbt9e",
+            "STAGE": "dev",
+            "USERS_TABLE": "dev-users",
+            "GEOCODING_API_KEY": "702de0e1d1f74fb6b4c024d029a9f6c1",
+            "DEFAULT_SENDER_EMAIL": "verified@email.com",
+            "POWERTOOLS_SERVICE_NAME": "security-incident-reporting",
+            "POWERTOOLS_TRACER_CAPTURE_RESPONSE": "true",
+            "POWERTOOLS_TRACER_CAPTURE_ERROR": "true"
+          }
+        },
+        "Role": {
+          "Fn::GetAtt": [
+            "IamRoleLambdaExecution",
+            "Arn"
+          ]
+        }
+      },
+      "DependsOn": [
+        "ApiLogGroup"
+      ]
+    },
+    "ProcessHighCredibilityIncidentLambdaFunction": {
+      "Type": "AWS::Lambda::Function",
+      "Properties": {
+        "Code": {
+          "S3Bucket": {
+            "Ref": "ServerlessDeploymentBucket"
+          },
+          "S3Key": "serverless/security-incident-reporting/dev/1754518141126-2025-08-06T22:09:01.126Z/security-incident-reporting.zip"
+        },
+        "Handler": "index.processHighCredibilityIncident",
+        "Runtime": "nodejs18.x",
+        "FunctionName": "security-incident-reporting-dev-processHighCredibilityIncident",
+        "MemorySize": 1024,
+        "Timeout": 60,
+        "Description": "Processes high credibility incidents from DynamoDB stream",
+        "TracingConfig": {
+          "Mode": "Active"
+        },
+        "Environment": {
+          "Variables": {
+            "DYNAMO_DB": "security-incident-reporting-dev-incidents",
+            "S3_BUCKET": "security-incident-reporting-dev-incident-media",
+            "SNS_TOPIC_ARN": {
+              "Ref": "IncidentAlertsTopic"
+            },
+            "COGNITO_USER_POOL_ID": "us-east-1_d5YngXjKC",
+            "COGNITO_USER_POOL_CLIENT_ID": "72ncbq4u2avoqdmfd58likbt9e",
+            "STAGE": "dev",
+            "USERS_TABLE": "dev-users",
+            "GEOCODING_API_KEY": "702de0e1d1f74fb6b4c024d029a9f6c1",
+            "DEFAULT_SENDER_EMAIL": "verified@email.com",
+            "POWERTOOLS_SERVICE_NAME": "security-incident-reporting",
+            "POWERTOOLS_TRACER_CAPTURE_RESPONSE": "true",
+            "POWERTOOLS_TRACER_CAPTURE_ERROR": "true"
+          }
+        },
+        "Role": {
+          "Fn::GetAtt": [
+            "IamRoleLambdaExecution",
+            "Arn"
+          ]
+        }
+      },
+      "DependsOn": [
+        "ProcessHighCredibilityIncidentLogGroup"
+      ]
+    },
+    "FraudAssessmentLambdaFunction": {
+      "Type": "AWS::Lambda::Function",
+      "Properties": {
+        "Code": {
+          "S3Bucket": {
+            "Ref": "ServerlessDeploymentBucket"
+          },
+          "S3Key": "serverless/security-incident-reporting/dev/1754518141126-2025-08-06T22:09:01.126Z/security-incident-reporting.zip"
+        },
+        "Handler": "handlers/fraudDetection.handler",
+        "Runtime": "nodejs18.x",
+        "FunctionName": "security-system-fraud-assessment",
+        "MemorySize": 512,
+        "Timeout": 30,
+        "Description": "Performs fraud assessment for incidents",
+        "TracingConfig": {
+          "Mode": "Active"
+        },
+        "Environment": {
+          "Variables": {
+            "DYNAMO_DB": "security-incident-reporting-dev-incidents",
+            "S3_BUCKET": "security-incident-reporting-dev-incident-media",
+            "SNS_TOPIC_ARN": {
+              "Ref": "IncidentAlertsTopic"
+            },
+            "COGNITO_USER_POOL_ID": "us-east-1_d5YngXjKC",
+            "COGNITO_USER_POOL_CLIENT_ID": "72ncbq4u2avoqdmfd58likbt9e",
+            "STAGE": "dev",
+            "USERS_TABLE": "dev-users",
+            "GEOCODING_API_KEY": "702de0e1d1f74fb6b4c024d029a9f6c1",
+            "DEFAULT_SENDER_EMAIL": "verified@email.com",
+            "POWERTOOLS_SERVICE_NAME": "fraud-assessment",
+            "POWERTOOLS_TRACER_CAPTURE_RESPONSE": "true",
+            "POWERTOOLS_TRACER_CAPTURE_ERROR": "true"
+          }
+        },
+        "Role": {
+          "Fn::GetAtt": [
+            "IamRoleLambdaExecution",
+            "Arn"
+          ]
+        }
+      },
+      "DependsOn": [
+        "FraudAssessmentLogGroup"
+      ]
+    },
+    "ApiGatewayRestApi": {
+      "Type": "AWS::ApiGateway::RestApi",
+      "Properties": {
+        "Name": "dev-security-incident-reporting",
+        "EndpointConfiguration": {
+          "Types": [
+            "EDGE"
+          ]
+        },
+        "Policy": ""
+      }
+    },
+    "ApiGatewayResourceProxyVar": {
+      "Type": "AWS::ApiGateway::Resource",
+      "Properties": {
+        "ParentId": {
+          "Fn::GetAtt": [
+            "ApiGatewayRestApi",
+            "RootResourceId"
+          ]
+        },
+        "PathPart": "{proxy+}",
+        "RestApiId": {
+          "Ref": "ApiGatewayRestApi"
+        }
+      }
+    },
+    "ApiGatewayMethodProxyVarOptions": {
+      "Type": "AWS::ApiGateway::Method",
+      "Properties": {
+        "AuthorizationType": "NONE",
+        "HttpMethod": "OPTIONS",
+        "MethodResponses": [
+          {
+            "StatusCode": "200",
+            "ResponseParameters": {
+              "method.response.header.Access-Control-Allow-Origin": true,
+              "method.response.header.Access-Control-Allow-Headers": true,
+              "method.response.header.Access-Control-Allow-Methods": true
+            },
+            "ResponseModels": {}
+          }
+        ],
+        "RequestParameters": {},
+        "Integration": {
+          "Type": "MOCK",
+          "RequestTemplates": {
+            "application/json": "{statusCode:200}"
+          },
+          "ContentHandling": "CONVERT_TO_TEXT",
+          "IntegrationResponses": [
+            {
+              "StatusCode": "200",
+              "ResponseParameters": {
+                "method.response.header.Access-Control-Allow-Origin": "'*'",
+                "method.response.header.Access-Control-Allow-Headers": "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,X-Amz-User-Agent'",
+                "method.response.header.Access-Control-Allow-Methods": "'OPTIONS,DELETE,GET,HEAD,PATCH,POST,PUT'"
+              },
+              "ResponseTemplates": {
+                "application/json": ""
+              }
+            }
+          ]
+        },
+        "ResourceId": {
+          "Ref": "ApiGatewayResourceProxyVar"
+        },
+        "RestApiId": {
+          "Ref": "ApiGatewayRestApi"
+        }
+      }
+    },
+    "ApiGatewayMethodProxyVarAny": {
+      "Type": "AWS::ApiGateway::Method",
+      "Properties": {
+        "HttpMethod": "ANY",
+        "RequestParameters": {},
+        "ResourceId": {
+          "Ref": "ApiGatewayResourceProxyVar"
+        },
+        "RestApiId": {
+          "Ref": "ApiGatewayRestApi"
+        },
+        "ApiKeyRequired": false,
+        "AuthorizationType": "COGNITO_USER_POOLS",
+        "AuthorizerId": {
+          "Ref": "ApiGatewayAuthorizer"
+        },
+        "AuthorizationScopes": [
+          "email",
+          "openid",
+          "profile"
+        ],
+        "Integration": {
+          "IntegrationHttpMethod": "POST",
+          "Type": "AWS_PROXY",
+          "Uri": {
+            "Fn::Join": [
+              "",
+              [
+                "arn:",
+                {
+                  "Ref": "AWS::Partition"
+                },
+                ":apigateway:",
+                {
+                  "Ref": "AWS::Region"
+                },
+                ":lambda:path/2015-03-31/functions/",
+                {
+                  "Fn::GetAtt": [
+                    "ApiLambdaFunction",
+                    "Arn"
+                  ]
+                },
+                "/invocations"
+              ]
+            ]
+          }
+        },
+        "MethodResponses": []
+      },
+      "DependsOn": [
+        "ApiLambdaPermissionApiGateway"
+      ]
+    },
+    "ApiGatewayDeployment1754518135465": {
+      "Type": "AWS::ApiGateway::Deployment",
+      "Properties": {
+        "RestApiId": {
+          "Ref": "ApiGatewayRestApi"
+        },
+        "StageName": "dev"
+      },
+      "DependsOn": [
+        "ApiGatewayMethodProxyVarOptions",
+        "ApiGatewayMethodProxyVarAny"
+      ]
+    },
+    "ApiLambdaPermissionApiGateway": {
+      "Type": "AWS::Lambda::Permission",
+      "Properties": {
+        "FunctionName": {
+          "Fn::GetAtt": [
+            "ApiLambdaFunction",
+            "Arn"
+          ]
+        },
+        "Action": "lambda:InvokeFunction",
+        "Principal": "apigateway.amazonaws.com",
+        "SourceArn": {
+          "Fn::Join": [
+            "",
+            [
+              "arn:",
+              {
+                "Ref": "AWS::Partition"
+              },
+              ":execute-api:",
+              {
+                "Ref": "AWS::Region"
+              },
+              ":",
+              {
+                "Ref": "AWS::AccountId"
+              },
+              ":",
+              {
+                "Ref": "ApiGatewayRestApi"
+              },
+              "/*/*"
+            ]
+          ]
+        }
+      }
+    },
+    "ProcessHighCredibilityIncidentEventSourceMappingDynamodbIncidentsTable": {
+      "Type": "AWS::Lambda::EventSourceMapping",
+      "DependsOn": [
+        "IamRoleLambdaExecution"
+      ],
+      "Properties": {
+        "BatchSize": 10,
+        "Enabled": true,
+        "EventSourceArn": {
+          "Fn::GetAtt": [
+            "IncidentsTable",
+            "StreamArn"
+          ]
+        },
+        "FunctionName": {
+          "Fn::GetAtt": [
+            "ProcessHighCredibilityIncidentLambdaFunction",
+            "Arn"
+          ]
+        },
+        "StartingPosition": "LATEST",
+        "MaximumRetryAttempts": 3,
+        "BisectBatchOnFunctionError": true
+      }
+    },
+    "IncidentsTable": {
+      "Type": "AWS::DynamoDB::Table",
+      "Properties": {
+        "TableName": "security-incident-reporting-dev-incidents",
+        "AttributeDefinitions": [
+          {
+            "AttributeName": "incidentId",
+            "AttributeType": "S"
+          },
+          {
+            "AttributeName": "status",
+            "AttributeType": "S"
+          },
+          {
+            "AttributeName": "createdAt",
+            "AttributeType": "S"
+          },
+          {
+            "AttributeName": "reporterId",
+            "AttributeType": "S"
+          }
+        ],
+        "KeySchema": [
+          {
+            "AttributeName": "incidentId",
+            "KeyType": "HASH"
+          }
+        ],
+        "GlobalSecondaryIndexes": [
+          {
+            "IndexName": "StatusCreatedAtIndex",
+            "KeySchema": [
+              {
+                "AttributeName": "status",
+                "KeyType": "HASH"
+              },
+              {
+                "AttributeName": "createdAt",
+                "KeyType": "RANGE"
+              }
+            ],
+            "Projection": {
+              "ProjectionType": "ALL"
+            }
+          },
+          {
+            "IndexName": "reporterId-index",
+            "KeySchema": [
+              {
+                "AttributeName": "reporterId",
+                "KeyType": "HASH"
+              }
+            ],
+            "Projection": {
+              "ProjectionType": "ALL"
+            }
+          }
+        ],
+        "BillingMode": "PAY_PER_REQUEST",
+        "StreamSpecification": {
+          "StreamViewType": "NEW_IMAGE"
+        },
+        "SSESpecification": {
+          "SSEEnabled": true,
+          "SSEType": "KMS",
+          "KMSMasterKeyId": "arn:aws:kms:us-east-1:717279717548:key/ac1be4af-138b-45af-80e4-1e9d1b09e7c8"
+        },
+        "TimeToLiveSpecification": {
+          "AttributeName": "expiresAt",
+          "Enabled": true
+        }
+      }
+    },
+    "UsersTable": {
+      "Type": "AWS::DynamoDB::Table",
+      "Properties": {
+        "TableName": "dev-users",
+        "AttributeDefinitions": [
+          {
+            "AttributeName": "id",
+            "AttributeType": "S"
+          }
+        ],
+        "KeySchema": [
+          {
+            "AttributeName": "id",
+            "KeyType": "HASH"
+          }
+        ],
+        "BillingMode": "PAY_PER_REQUEST"
+      }
+    },
+    "IncidentMediaBucket": {
+      "Type": "AWS::S3::Bucket",
+      "Properties": {
+        "BucketName": "security-incident-reporting-dev-incident-media",
+        "AccessControl": "Private",
+        "PublicAccessBlockConfiguration": {
+          "BlockPublicAcls": true,
+          "IgnorePublicAcls": true,
+          "BlockPublicPolicy": true,
+          "RestrictPublicBuckets": true
+        },
+        "BucketEncryption": {
+          "ServerSideEncryptionConfiguration": [
+            {
+              "ServerSideEncryptionByDefault": {
+                "SSEAlgorithm": "AES256"
+              }
+            }
+          ]
+        },
+        "LifecycleConfiguration": {
+          "Rules": [
+            {
+              "Id": "ExpireMediaAfter30Days",
+              "Status": "Enabled",
+              "ExpirationInDays": 30
+            }
+          ]
+        }
+      }
+    },
+    "IncidentAlertsTopic": {
+      "Type": "AWS::SNS::Topic",
+      "Properties": {
+        "TopicName": "security-incident-reporting-dev-incident-alerts",
+        "KmsMasterKeyId": "alias/aws/sns"
+      }
+    },
+    "IncidentProcessingDLQ": {
+      "Type": "AWS::SQS::Queue",
+      "Properties": {
+        "QueueName": "security-incident-reporting-dev-incident-processing-dlq",
+        "MessageRetentionPeriod": 1209600
+      }
+    },
+    "CognitoUserPoolV2": {
+      "Type": "AWS::Cognito::UserPool",
+      "Properties": {
+        "UserPoolName": "security-incident-reporting-dev-user-pool-v2",
+        "UsernameConfiguration": {
+          "CaseSensitive": false
+        },
+        "AutoVerifiedAttributes": [
+          "email"
+        ],
+        "Policies": {
+          "PasswordPolicy": {
+            "MinimumLength": 12,
+            "RequireUppercase": true,
+            "RequireLowercase": true,
+            "RequireNumbers": true,
+            "RequireSymbols": true,
+            "TemporaryPasswordValidityDays": 7
+          }
+        },
+        "Schema": [
+          {
+            "Name": "email",
+            "Required": true,
+            "Mutable": true
+          },
+          {
+            "Name": "firstName",
+            "AttributeDataType": "String",
+            "Mutable": true,
+            "Required": false
+          },
+          {
+            "Name": "lastName",
+            "AttributeDataType": "String",
+            "Mutable": true,
+            "Required": false
+          },
+          {
+            "Name": "role",
+            "AttributeDataType": "String",
+            "Mutable": true,
+            "Required": false
+          }
+        ],
+        "AccountRecoverySetting": {
+          "RecoveryMechanisms": [
+            {
+              "Name": "verified_email",
+              "Priority": 1
+            }
+          ]
+        },
+        "AdminCreateUserConfig": {
+          "AllowAdminCreateUserOnly": false
+        },
+        "DeviceConfiguration": {
+          "ChallengeRequiredOnNewDevice": true,
+          "DeviceOnlyRememberedOnUserPrompt": true
+        },
+        "EmailConfiguration": {
+          "EmailSendingAccount": "COGNITO_DEFAULT"
+        },
+        "UserPoolAddOns": {
+          "AdvancedSecurityMode": "ENFORCED"
+        },
+        "VerificationMessageTemplate": {
+          "DefaultEmailOption": "CONFIRM_WITH_CODE"
+        }
+      }
+    },
+    "CognitoUserPoolClient": {
+      "Type": "AWS::Cognito::UserPoolClient",
+      "Properties": {
+        "ClientName": "security-incident-reporting-dev-client",
+        "UserPoolId": {
+          "Ref": "CognitoUserPoolV2"
+        },
+        "GenerateSecret": false,
+        "ExplicitAuthFlows": [
+          "ALLOW_USER_PASSWORD_AUTH",
+          "ALLOW_REFRESH_TOKEN_AUTH",
+          "ALLOW_USER_SRP_AUTH"
+        ],
+        "PreventUserExistenceErrors": "ENABLED",
+        "SupportedIdentityProviders": [
+          "COGNITO"
+        ],
+        "CallbackURLs": [
+          "http://localhost:3000"
+        ],
+        "LogoutURLs": [
+          "http://localhost:3000/logout"
+        ],
+        "AllowedOAuthFlows": [
+          "code"
+        ],
+        "AllowedOAuthScopes": [
+          "email",
+          "openid",
+          "profile"
+        ],
+        "AllowedOAuthFlowsUserPoolClient": true,
+        "RefreshTokenValidity": 30,
+        "AccessTokenValidity": 60,
+        "IdTokenValidity": 60,
+        "TokenValidityUnits": {
+          "AccessToken": "minutes",
+          "IdToken": "minutes",
+          "RefreshToken": "days"
+        }
+      }
+    },
+    "ApiGatewayAuthorizer": {
+      "Type": "AWS::ApiGateway::Authorizer",
+      "Properties": {
+        "Name": "security-incident-reporting-dev-authorizer",
+        "Type": "COGNITO_USER_POOLS",
+        "IdentitySource": "method.request.header.Authorization",
+        "RestApiId": {
+          "Ref": "ApiGatewayRestApi"
+        },
+        "ProviderARNs": [
+          {
+            "Fn::GetAtt": [
+              "CognitoUserPoolV2",
+              "Arn"
+            ]
+          }
+        ]
+      }
+    }
+  },
+  "Outputs": {
+    "ServerlessDeploymentBucketName": {
+      "Value": {
+        "Ref": "ServerlessDeploymentBucket"
+      },
+      "Export": {
+        "Name": "sls-security-incident-reporting-dev-ServerlessDeploymentBucketName"
+      }
+    },
+    "ServiceEndpoint": {
+      "Description": "URL of the service endpoint",
+      "Value": {
+        "Fn::Join": [
+          "",
+          [
+            "https://",
+            {
+              "Ref": "ApiGatewayRestApi"
+            },
+            ".execute-api.",
+            {
+              "Ref": "AWS::Region"
+            },
+            ".",
+            {
+              "Ref": "AWS::URLSuffix"
+            },
+            "/dev"
+          ]
+        ]
+      },
+      "Export": {
+        "Name": "sls-security-incident-reporting-dev-ServiceEndpoint"
+      }
+    }
+  }
+}
