@@ -32,6 +32,40 @@ const USER_ROLES = {
   ADMIN: 'ADMIN',
 };
 
+// Department definitions
+const DEPARTMENTS = {
+  SECURITY: {
+    name: 'Security Department',
+    email: 'security@campus.edu',
+    phone: '+1-555-0101',
+    description: 'Handles physical security incidents and safety hazards'
+  },
+  IT_SECURITY: {
+    name: 'IT Security Department',
+    email: 'itsecurity@campus.edu',
+    phone: '+1-555-0102',
+    description: 'Handles cybersecurity incidents and digital threats'
+  },
+  FACILITIES: {
+    name: 'Facilities Management',
+    email: 'facilities@campus.edu',
+    phone: '+1-555-0103',
+    description: 'Handles infrastructure and facility-related incidents'
+  },
+  EMERGENCY: {
+    name: 'Emergency Response',
+    email: 'emergency@campus.edu',
+    phone: '+1-555-0104',
+    description: 'Handles critical emergency situations'
+  },
+  ADMINISTRATION: {
+    name: 'Administration',
+    email: 'admin@campus.edu',
+    phone: '+1-555-0105',
+    description: 'Handles administrative and policy-related incidents'
+  }
+};
+
 // Machine learning thresholds (configurable via environment variables)
 const ML_THRESHOLDS = {
   FRAUD_DETECTION: parseFloat(getEnvironmentVariable('FRAUD_DETECTION_THRESHOLD', '0.7')),
@@ -64,10 +98,11 @@ module.exports = {
   INCIDENT_TYPES,
   SEVERITY_LEVELS,
   USER_ROLES,
+  DEPARTMENTS,
   ML_THRESHOLDS,
   NOTIFICATION_SETTINGS,
   cognitoUserPoolId,
   cognitoClientId,
   cognitoIssuer,
-  TABLES
+  TABLES,
 };

@@ -9,7 +9,7 @@ const logger = new Logger({ serviceName: 'security-incident-reporting' });
 const dynamodbClient = new DynamoDBClient({ region: process.env.AWS_REGION || 'us-east-1' });
 const dynamodb = DynamoDBDocumentClient.from(dynamodbClient);
 const INCIDENTS_TABLE = process.env.INCIDENTS_TABLE_NAME || 'security-incident-reporting-dev-incidents';
-const INCIDENT_ATTACHMENTS_BUCKET = process.env.S3_INCIDENT_MEDIA_BUCKET || 'security-incident-reporting-dev-incident-media';
+const INCIDENT_ATTACHMENTS_BUCKET = process.env.S3_BUCKET || 'security-incident-reporting-dev-incident-media';
 
 /**
  * Create a new incident

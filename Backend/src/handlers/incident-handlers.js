@@ -10,16 +10,17 @@ const fraudDetectionService = require('../ml/fraudDetection');
 const snsService = require('../notification/snsService');
 const { shouldTriggerAlert, calculatePriorityLevel } = require('../notification/alertRules');
 const { Incident, INCIDENT_STATUS } = require('../data/models/incidents');
-const { TABLES } = require('../config/config');
+const { TABLES, DEPARTMENTS } = require('../config/config');
 const { createItem, getItemById, updateItem, deleteItem, scanTable } = require('../data/dynamodbclient');
 const { generateApiResponse } = require('../utils/api-response');
 const { getUserDetails } = require('../auth/cognito');
 const fetch = require('node-fetch');
 const { User } = require('../data/models/users');
+const { formatDepartmentAssignmentNotification } = require('../notification/templates');
 
 const s3 = new S3Client({ region: process.env.AWS_REGION || 'us-east-1' });
 const lambda = new LambdaClient({ region: process.env.AWS_REGION || 'us-east-1' });
-const BUCKET_NAME = process.env.S3_INCIDENT_MEDIA_BUCKET || 'security-incident-reporting-dev-incident-media';
+const BUCKET_NAME = process.env.S3_BUCKET || 'security-incident-reporting-dev-incident-media';
 
 const supportedContentTypes = [
   'image/jpeg',
@@ -525,6 +526,132 @@ const listAllIncidents = async (event) => {
 };
 
 /**
+ * Assign incident to a department (used by POST /incidents/{id}/assign)
+ */
+const assignIncidentToDepartment = async (event) => {
+  try {
+    const incidentId = event.pathParameters.id;
+    const data = typeof event.body === 'string' ? JSON.parse(event.body) : event.body;
+    const { departmentId, notes } = data;
+
+    // Validate required fields
+    if (!departmentId) {
+      return generateApiResponse(400, { error: 'Department ID is required' });
+    }
+
+    // Validate department exists
+    const department = DEPARTMENTS[departmentId.toUpperCase()];
+    if (!department) {
+      return generateApiResponse(400, { 
+        error: 'Invalid department ID', 
+        availableDepartments: Object.keys(DEPARTMENTS) 
+      });
+    }
+
+    // Get authenticated user
+    const authHeader = event.headers?.Authorization || event.headers?.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return generateApiResponse(401, { error: 'Missing or invalid Authorization header' });
+    }
+
+    const token = authHeader.split(' ')[1];
+    const user = await getUserDetails(token);
+    const assignedBy = user?.sub;
+    if (!assignedBy) {
+      return generateApiResponse(401, { error: 'Invalid token: no user ID' });
+    }
+
+    // Get assigned by user name
+    let assignedByName = 'Unknown';
+    try {
+      const userItem = await userRepo.getUserById(assignedBy);
+      if (userItem) {
+        const assignedByUser = User.fromDynamoItem(userItem);
+        assignedByName = assignedByUser.toPublicJSON().fullName;
+      }
+    } catch (err) {
+      console.warn('Failed to fetch assigned by user name:', err);
+      assignedByName = `User ${assignedBy}`;
+    }
+
+    // Get the incident
+    const incident = await incidentRepo.getIncidentById(incidentId);
+    if (!incident) {
+      return generateApiResponse(404, { error: 'Incident not found' });
+    }
+
+    // Update incident with department assignment
+    const updates = {
+      assignedTo: departmentId.toUpperCase(),
+      assignedBy: assignedBy,
+      assignedAt: new Date().toISOString(),
+      status: INCIDENT_STATUS.IN_PROGRESS,
+      assignmentNotes: notes || null,
+      updatedAt: new Date().toISOString()
+    };
+
+    const updatedIncident = await incidentRepo.updateIncident(incident.updateFromObject(updates));
+
+    // Send notification to department
+    try {
+      const notificationMessage = formatDepartmentAssignmentNotification(
+        updatedIncident.toPublicJSON(),
+        department,
+        assignedByName
+      );
+
+      const subject = `Incident Assignment: ${incident.incidentId} - ${department.name}`;
+      
+      // Send email notification to department
+      await snsService.sendNotification(
+        process.env.SNS_TOPIC_ARN || 'arn:aws:sns:us-east-1:717279717548:security-incident-reporting-dev-incident-alerts',
+        subject,
+        notificationMessage,
+        {
+          incidentId: incident.incidentId,
+          departmentId: departmentId.toUpperCase(),
+          severityLevel: incident.severityLevel,
+          assignmentType: 'department'
+        }
+      );
+
+      console.log(`Department assignment notification sent to ${department.name} for incident ${incidentId}`);
+    } catch (notificationError) {
+      console.error('Failed to send department assignment notification:', notificationError);
+      // Don't fail the assignment if notification fails
+    }
+
+    return generateApiResponse(200, {
+      message: 'Incident successfully assigned to department',
+      incident: updatedIncident.toPublicJSON(),
+      department: department,
+      assignedBy: assignedByName
+    });
+
+  } catch (error) {
+    console.error('Error assigning incident to department:', error);
+    return generateApiResponse(500, { error: 'Failed to assign incident to department', details: error.message });
+  }
+};
+
+/**
+ * Get available departments (used by GET /departments)
+ */
+const getDepartments = async (event) => {
+  try {
+    return generateApiResponse(200, {
+      departments: Object.entries(DEPARTMENTS).map(([key, dept]) => ({
+        id: key,
+        ...dept
+      }))
+    });
+  } catch (error) {
+    console.error('Error getting departments:', error);
+    return generateApiResponse(500, { error: 'Failed to get departments' });
+  }
+};
+
+/**
  * Assess fraud risk for an incident
  */
 const assessFraudRisk = async (event) => {
@@ -595,4 +722,6 @@ module.exports = {
   listMyIncidents,
   getMediaUploadUrl,
   addAttachment,
+  assignIncidentToDepartment,
+  getDepartments,
 };

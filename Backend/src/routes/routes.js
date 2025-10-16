@@ -73,16 +73,33 @@ const defineRoutes = () => ({
     put: { handler: loggingMiddleware(incidentHandlers.updateIncidentStatus), middleware: [lambdaAuthenticate] },
     delete: { handler: loggingMiddleware(incidentHandlers.deleteIncident), middleware: [lambdaAuthenticate] },
   },
+  '/incidents/:id/assign': {
+    post: { 
+      handler: loggingMiddleware(incidentHandlers.assignIncidentToDepartment), 
+      middleware: [lambdaAuthenticate, lambdaAuthorize([USER_ROLES.SECURITY_PERSONNEL, USER_ROLES.ADMIN])] 
+    },
+  },
   '/incidents/my': {
     get: {
       handler: loggingMiddleware(incidentHandlers.listMyIncidents),
       middleware: [lambdaAuthenticate],
     },
   },
+  '/departments': {
+    get: { 
+      handler: loggingMiddleware(incidentHandlers.getDepartments), 
+      middleware: [lambdaAuthenticate] 
+    },
+  },
 
   // S3 Upload
   '/incidents/:id/media/upload-url': { // Changed from :incidentId to :id
     post: { handler: loggingMiddleware(s3Handlers.getIncidentMediaUploadUrl), middleware: [lambdaAuthenticate] },
+  },
+
+  // S3 Add Attachment
+  '/incidents/:id/media': {
+    post: { handler: loggingMiddleware(s3Handlers.addIncidentAttachment), middleware: [lambdaAuthenticate] },
   },
 
   // S3 Download

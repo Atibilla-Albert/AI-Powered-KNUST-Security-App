@@ -47,10 +47,11 @@ const IncidentDetail = () => {
 
   const isAdmin = user?.role === 'ADMIN';
 
-  const stableAttachments = useMemo(
-    () => (incident?.attachments ? [...incident.attachments] : []),
-    [incident?.attachments]
-  );
+  const stableAttachments = useMemo(() => {
+    const attachments = incident?.attachments ? [...incident.attachments] : [];
+    console.log('Incident attachments:', attachments);
+    return attachments;
+  }, [incident?.attachments]);
 
   const fetchIncident = useCallback(async () => {
     setError(null);

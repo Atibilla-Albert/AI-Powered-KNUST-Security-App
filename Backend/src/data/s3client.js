@@ -107,7 +107,7 @@ const generateIncidentAttachmentKey = (incidentId, fileName) => {
  * Create and configure S3 buckets
  */
 const createBuckets = async () => {
-  const bucketName = S3_CONFIG.BUCKETS.INCIDENT_ATTACHMENTS;
+  const bucketName = S3_CONFIG.BUCKETS.INCIDENT_MEDIA;
 
   try {
     await s3Client.send(new CreateBucketCommand({ Bucket: bucketName }));

@@ -182,6 +182,32 @@
   font-size: 2rem;
 }
 
+/* Lazy loading placeholder */
+.media-preview .lazy-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: #6c757d;
+  font-size: 0.8rem;
+}
+
+.media-preview .lazy-placeholder i {
+  font-size: 32px;
+  margin-bottom: 8px;
+  opacity: 0.6;
+}
+
+.media-preview .lazy-placeholder span {
+  font-weight: 500;
+}
+
+/* Optimized image loading */
+.media-preview img {
+  loading: lazy;
+  decoding: async;
+}
+
 .media-info {
   padding: 12px;
 }

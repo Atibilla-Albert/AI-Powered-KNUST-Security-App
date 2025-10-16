@@ -98,7 +98,122 @@ const createIncidentSummary = (incident, fraudAssessment = null) => {
   return summary;
 };
 
+/**
+ * Format department assignment notification
+ * @param {Object} incident - Incident data
+ * @param {Object} department - Department data
+ * @param {string} assignedBy - User who assigned the incident
+ * @returns {string} Formatted notification message
+ */
+const formatDepartmentAssignmentNotification = (incident, department, assignedBy) => {
+  const location = incident.location || {};
+  
+  // Enhanced location formatting
+  const formatLocationDetails = () => {
+    let locationDetails = '';
+    
+    if (location.name) {
+      locationDetails += `📍 Location Name: ${location.name}\n`;
+    }
+    
+    if (location.address) {
+      locationDetails += `🏠 Address: ${location.address}\n`;
+    }
+    
+    if (location.latitude && location.longitude) {
+      locationDetails += `🗺️  Coordinates: ${location.latitude}, ${location.longitude}\n`;
+    }
+    
+    if (location.building) {
+      locationDetails += `🏢 Building: ${location.building}\n`;
+    }
+    
+    if (location.floor) {
+      locationDetails += `🛗 Floor: ${location.floor}\n`;
+    }
+    
+    if (location.room) {
+      locationDetails += `🚪 Room: ${location.room}\n`;
+    }
+    
+    if (location.landmarks) {
+      locationDetails += `🏛️  Nearby Landmarks: ${location.landmarks}\n`;
+    }
+    
+    return locationDetails || '📍 Location: Unknown location';
+  };
+
+  // Generate map route links for different map services
+  const generateMapLinks = (lat, lon) => {
+    if (!lat || !lon) return 'Map route not available - location coordinates missing';
+    
+    const googleMapsLink = `https://www.google.com/maps/dir/?api=1&destination=${lat},${lon}`;
+    const appleMapsLink = `http://maps.apple.com/?daddr=${lat},${lon}`;
+    const wazeLink = `https://waze.com/ul?ll=${lat},${lon}&navigate=yes`;
+    const osmLink = `https://www.openstreetmap.org/directions?engine=fossgis_osrm_car&route=-1|${lon}|${lat}`;
+    
+    return `
+🗺️  NAVIGATION LINKS:
+   Google Maps: ${googleMapsLink}
+   Apple Maps: ${appleMapsLink}
+   Waze: ${wazeLink}
+   OpenStreetMap: ${osmLink}`;
+  };
+
+  const locationDetails = formatLocationDetails();
+  const mapLinks = location.latitude && location.longitude ? 
+    generateMapLinks(location.latitude, location.longitude) : 
+    'Map route not available - location coordinates missing';
+
+  const message = `
+🚨 INCIDENT ASSIGNED TO DEPARTMENT 🚨
+
+═══════════════════════════════════════════════════════════════
+
+📋 INCIDENT DETAILS:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🆔 Incident ID: ${incident.incidentId || 'Unknown'}
+📝 Type: ${incident.incidentType || incident.type}
+⚠️  Severity: ${incident.severityLevel} (Scale 1-5)
+📊 Status: ${incident.status}
+🕐 Time Reported: ${formatDate(incident.createdAt || incident.timestamp || new Date())}
+📄 Description: ${incident.description}
+
+📍 INCIDENT LOCATION:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+${locationDetails}
+
+${mapLinks}
+
+═══════════════════════════════════════════════════════════════
+
+👥 ASSIGNMENT DETAILS:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🏢 Assigned Department: ${department.name}
+📧 Department Email: ${department.email}
+📞 Department Phone: ${department.phone}
+👤 Assigned By: ${assignedBy}
+🕐 Assignment Time: ${formatDate(new Date())}
+
+═══════════════════════════════════════════════════════════════
+
+
+📞 DEPARTMENT CONTACT INFORMATION:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📧 Email: ${department.email}
+📞 Phone: ${department.phone}
+
+This is an automated notification from the Campus Security Incident Reporting System.
+Please respond promptly to ensure campus safety.
+
+═══════════════════════════════════════════════════════════════
+`;
+
+  return message;
+};
+
 module.exports = {
   formatIncidentForNotification,
-  createIncidentSummary
+  createIncidentSummary,
+  formatDepartmentAssignmentNotification
 };

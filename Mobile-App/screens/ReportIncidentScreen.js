@@ -24,6 +24,7 @@ import {
   reportIncident,
   getIncidentMediaUploadUrl,
   uploadToS3,
+  addIncidentAttachment,
 } from '../Services/api';
 import FloatingSOSButton from './Emergency';
 
@@ -424,7 +425,10 @@ export default function ReportScreen({ navigation }) {
         contentType = normalizeContentType(contentType, fileName);
         console.log('Getting upload URL for:', { incidentId, fileName, contentType });
         const presignRes = await getIncidentMediaUploadUrl(incidentId, fileName, contentType);
-        return uploadToS3(presignRes.data.url, uri, contentType);
+        await uploadToS3(presignRes.data.url, uri, contentType);
+        // Add attachment to incident after successful upload
+        await addIncidentAttachment(incidentId, presignRes.data.key);
+        return presignRes.data.key;
       });
 
       await Promise.all(uploads);
@@ -557,7 +561,7 @@ export default function ReportScreen({ navigation }) {
           />
 
           <View style={styles.buttonContainer}>
-            <TouchableOpacity onPress={pickMedia} style={[styles.actionButton, { backgroundColor: '#3b82f6' }]}>
+            <TouchableOpacity onPress={pickMedia} style={[styles.actionButton, { backgroundColor: '#10b981' }]}>
               <Text style={styles.actionButtonText}>Pick Media</Text>
             </TouchableOpacity>
             <TouchableOpacity onPress={takePhoto} style={[styles.actionButton, { backgroundColor: '#10b981' }]}>

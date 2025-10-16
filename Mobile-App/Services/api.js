@@ -332,6 +332,27 @@ export const uploadToS3 = async (presignedUrl, fileUri, contentType) => {
   return true;
 };
 
+// Add attachment to incident
+export const addIncidentAttachment = (incidentId, key) => {
+  if (__DEV__) console.log('Adding attachment to incident', { incidentId, key });
+  return api
+    .post(`/incidents/${incidentId}/media`, { key })
+    .then((response) => {
+      if (__DEV__) console.log('Attachment added successfully', response.data);
+      return response;
+    })
+    .catch((error) => {
+      if (__DEV__) {
+        console.error('Failed to add attachment:', {
+          status: error.response?.status,
+          data: error.response?.data,
+          message: error.message,
+        });
+      }
+      throw error;
+    });
+};
+
 // ------------------ EMERGENCY ALERT ------------------
 export const sendEmergencyAlert = async (
   { latitude, longitude, address, timestamp, accuracy },

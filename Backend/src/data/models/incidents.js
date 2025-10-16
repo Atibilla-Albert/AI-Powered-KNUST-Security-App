@@ -44,6 +44,9 @@ class Incident {
     this.recommendation = data.recommendation || null;
     this.confidenceScore = data.confidenceScore || null;
     this.assignedTo = data.assignedTo || null;
+    this.assignedBy = data.assignedBy || null;
+    this.assignedAt = data.assignedAt || null;
+    this.assignmentNotes = data.assignmentNotes || null;
     this.resolutionNotes = data.resolutionNotes || null;
     this.resolutionTimestamp = data.resolutionTimestamp || null;
 
@@ -94,6 +97,9 @@ class Incident {
       recommendation: this.recommendation,
       confidenceScore: this.confidenceScore,
       assignedTo: this.assignedTo,
+      assignedBy: this.assignedBy,
+      assignedAt: this.assignedAt,
+      assignmentNotes: this.assignmentNotes,
       resolutionNotes: this.resolutionNotes,
       resolutionTimestamp: this.resolutionTimestamp,
     };
@@ -118,6 +124,9 @@ class Incident {
       recommendation: this.recommendation,
       confidenceScore: this.confidenceScore,
       assignedTo: this.assignedTo,
+      assignedBy: this.assignedBy,
+      assignedAt: this.assignedAt,
+      assignmentNotes: this.assignmentNotes,
       resolutionNotes: this.resolutionNotes,
       resolutionTimestamp: this.resolutionTimestamp,
     };
@@ -142,6 +151,9 @@ class Incident {
       recommendation: item.recommendation || null,
       confidenceScore: item.confidenceScore || null,
       assignedTo: item.assignedTo || null,
+      assignedBy: item.assignedBy || null,
+      assignedAt: item.assignedAt || null,
+      assignmentNotes: item.assignmentNotes || null,
       resolutionNotes: item.resolutionNotes || null,
       resolutionTimestamp: item.resolutionTimestamp || null,
     });
@@ -184,6 +196,9 @@ class Incident {
       'incidentType',
       'location',
       'assignedTo',
+      'assignedBy',
+      'assignedAt',
+      'assignmentNotes',
       'status',
       'resolutionNotes',
       'reporterName',
