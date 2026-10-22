@@ -32,37 +32,151 @@ const USER_ROLES = {
   ADMIN: 'ADMIN',
 };
 
-// Department definitions
+// Department definitions (keys are IDs expected by the API/UI)
 const DEPARTMENTS = {
   SECURITY: {
-    name: 'Security Department',
-    email: 'security@campus.edu',
+    name: 'Security',
+    email: 'Atibillaalbert66@gmail.com',
     phone: '+1-555-0101',
     description: 'Handles physical security incidents and safety hazards'
   },
-  IT_SECURITY: {
-    name: 'IT Security Department',
-    email: 'itsecurity@campus.edu',
-    phone: '+1-555-0102',
-    description: 'Handles cybersecurity incidents and digital threats'
+  WOODWORK: {
+    name: 'Woodwork',
+    email: 'woodwork@campus.edu',
+    phone: '+1-555-0201',
+    description: 'Carpentry and woodworks-related requests and incidents'
   },
-  FACILITIES: {
-    name: 'Facilities Management',
-    email: 'facilities@campus.edu',
-    phone: '+1-555-0103',
-    description: 'Handles infrastructure and facility-related incidents'
+  ELECTRICAL: {
+    name: 'Electrical',
+    email: 'electrical@campus.edu',
+    phone: '+1-555-0202',
+    description: 'Electrical faults and power-related issues'
   },
-  EMERGENCY: {
-    name: 'Emergency Response',
-    email: 'emergency@campus.edu',
-    phone: '+1-555-0104',
-    description: 'Handles critical emergency situations'
+  ROADWORTHY: {
+    name: 'Roadworthy',
+    email: 'roadworthy@campus.edu',
+    phone: '+1-555-0203',
+    description: 'Road, traffic, and vehicular safety'
+  },
+  MECHANICAL: {
+    name: 'Mechanical',
+    email: 'mechanical@campus.edu',
+    phone: '+1-555-0204',
+    description: 'Mechanical systems and maintenance'
+  },
+  BUILDING_CONSTRUCTION: {
+    name: 'Building & Construction',
+    email: 'construction@campus.edu',
+    phone: '+1-555-0205',
+    description: 'Building integrity and construction-related issues'
+  },
+  INFORMATION_TECHNOLOGY: {
+    name: 'Information Technology',
+    email: 'it@campus.edu',
+    phone: '+1-555-0206',
+    description: 'IT support and systems'
   },
   ADMINISTRATION: {
     name: 'Administration',
-    email: 'admin@campus.edu',
-    phone: '+1-555-0105',
-    description: 'Handles administrative and policy-related incidents'
+    email: 'administration@campus.edu',
+    phone: '+1-555-0207',
+    description: 'Administrative and policy-related matters'
+  },
+  STUDENT_AFFAIRS: {
+    name: 'Student Affairs',
+    email: 'studentaffairs@campus.edu',
+    phone: '+1-555-0208',
+    description: 'Student welfare and services'
+  },
+  FACILITIES_MANAGEMENT: {
+    name: 'Facilities Management',
+    email: 'facilities@campus.edu',
+    phone: '+1-555-0209',
+    description: 'Campus facilities and utilities'
+  },
+  HEALTH_SERVICES: {
+    name: 'Health Services',
+    email: 'health@campus.edu',
+    phone: '+1-555-0210',
+    description: 'Health and medical services'
+  },
+  TRANSPORTATION: {
+    name: 'Transportation',
+    email: 'transport@campus.edu',
+    phone: '+1-555-0211',
+    description: 'Campus transport and logistics'
+  },
+  CATERING: {
+    name: 'Catering',
+    email: 'catering@campus.edu',
+    phone: '+1-555-0212',
+    description: 'Food services and catering'
+  },
+  LIBRARY: {
+    name: 'Library',
+    email: 'library@campus.edu',
+    phone: '+1-555-0213',
+    description: 'Library services and resources'
+  },
+  SPORTS_RECREATION: {
+    name: 'Sports & Recreation',
+    email: 'sports@campus.edu',
+    phone: '+1-555-0214',
+    description: 'Sports facilities and recreation'
+  },
+  ACADEMIC_AFFAIRS: {
+    name: 'Academic Affairs',
+    email: 'academics@campus.edu',
+    phone: '+1-555-0215',
+    description: 'Academic programs and affairs'
+  },
+  RESEARCH_DEVELOPMENT: {
+    name: 'Research & Development',
+    email: 'research@campus.edu',
+    phone: '+1-555-0216',
+    description: 'Research programs and innovation'
+  },
+  HUMAN_RESOURCES: {
+    name: 'Human Resources',
+    email: 'hr@campus.edu',
+    phone: '+1-555-0217',
+    description: 'Staffing and HR services'
+  },
+  LEGAL_SERVICES: {
+    name: 'Legal Services',
+    email: 'legal@campus.edu',
+    phone: '+1-555-0218',
+    description: 'Legal counsel and compliance'
+  },
+  PUBLIC_RELATIONS: {
+    name: 'Public Relations',
+    email: 'pr@campus.edu',
+    phone: '+1-555-0219',
+    description: 'Communications and public relations'
+  },
+  ENVIRONMENTAL_SERVICES: {
+    name: 'Environmental Services',
+    email: 'environment@campus.edu',
+    phone: '+1-555-0220',
+    description: 'Environmental health and sanitation'
+  },
+  EMERGENCY_RESPONSE: {
+    name: 'Emergency Response',
+    email: 'emergency@campus.edu',
+    phone: '+1-555-0221',
+    description: 'Critical emergency response coordination'
+  },
+  QUALITY_ASSURANCE: {
+    name: 'Quality Assurance',
+    email: 'qa@campus.edu',
+    phone: '+1-555-0222',
+    description: 'Quality standards and oversight'
+  },
+  IT_SECURITY: {
+    name: 'IT Security',
+    email: 'itsecurity@campus.edu',
+    phone: '+1-555-0223',
+    description: 'Cybersecurity and digital threat response'
   }
 };
 
