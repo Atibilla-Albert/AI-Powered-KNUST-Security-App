@@ -58,6 +58,8 @@ Never log request bodies, passwords, authorization headers, JWTs, refresh tokens
 5. Verify public auth routes work without a token; all protected routes reject missing, expired, ID, wrong-pool, and wrong-client tokens.
 6. Verify a regular user cannot access another user's incident/media, assign incidents, update status, delete incidents, or administer users.
 7. Confirm logs and traces contain no credentials, tokens, incident payloads, or pre-signed URLs.
-8. Deploy to a staging environment and run smoke tests before production.
+8. Enable and verify Cognito advanced security/adaptive authentication and MFA for administrators in the actual configured User Pool.
+9. Add AWS WAF rate-based protections for public authentication endpoints and alarms for repeated failed logins; do not embed API keys in the app as a substitute for rate limiting.
+10. Deploy to a staging environment and run smoke tests before production.
 
 This hardening reduces common authentication and authorization risks, but production readiness still requires automated tests, review of all remaining handlers and IAM permissions, and verification against the deployed AWS configuration.
