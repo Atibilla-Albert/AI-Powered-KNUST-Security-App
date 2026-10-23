@@ -111,7 +111,7 @@ export default function FloatingSOSButton() {
       };
 
 
-      const response = await sendEmergencyAlert(payload); // token auto-injected by interceptor
+      await sendEmergencyAlert(payload); // token auto-injected by interceptor
 
       Toast.show({
         type: 'success',
