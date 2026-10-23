@@ -33,6 +33,7 @@ provider:
     COGNITO_ISSUER_URL: !Sub "https://cognito-idp.${AWS::Region}.amazonaws.com/${CognitoUserPoolV2}"
     STAGE: ${self:provider.stage}
     USERS_TABLE: dev-users
+    USERS_TABLE_NAME: dev-users
     GEOCODING_API_KEY: ${env:GEOCODING_API_KEY, ''}
     DEFAULT_SENDER_EMAIL: ${env:DEFAULT_SENDER_EMAIL, 'no-reply@example.com'}
     POWERTOOLS_SERVICE_NAME: ${self:service}
