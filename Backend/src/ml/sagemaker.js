@@ -7,7 +7,7 @@ const API_ENDPOINT = process.env.REACT_APP_API_ENDPOINT || 'http://localhost:300
 
 const getIncidentRiskAnalysis = async (data) => {
   try {
-    console.log('Sending risk analysis request:', JSON.stringify(data, null, 2));
+    console.info('Sending risk analysis request');
     const response = await fetch(`${API_ENDPOINT}/ml/analyze-risk`, {
       method: 'POST',
       headers: {
@@ -19,21 +19,15 @@ const getIncidentRiskAnalysis = async (data) => {
 
     if (!response.ok) {
       const errorData = await response.json();
-      console.error('Risk analysis error:', {
-        status: response.status,
-        error: errorData.error,
-      });
+      console.error('Risk analysis request failed', { status: response.status });
       throw new Error(errorData.error || 'Failed to analyze incident risk');
     }
 
     const result = await response.json();
-    console.log('Risk analysis response:', JSON.stringify(result, null, 2));
+    console.info('Risk analysis response received');
     return result;
   } catch (error) {
-    console.error('Error in getIncidentRiskAnalysis:', {
-      message: error.message,
-      stack: error.stack,
-    });
+    console.error('Risk analysis operation failed', { name: error.name || 'Error' });
     throw error;
   }
 };

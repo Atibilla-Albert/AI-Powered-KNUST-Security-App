@@ -2,6 +2,7 @@ import React from 'react';
 import * as native from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import Toast from 'react-native-toast-message';
+import { AuthProvider } from './authContext';
 
 // Screens
 import HomeScreen from './screens/HomeScreen';
@@ -17,7 +18,7 @@ const Stack = createNativeStackNavigator();
 
 export default function App() {
   return (
-    <>
+    <AuthProvider>
       <native.NavigationContainer>
         <Stack.Navigator initialRouteName="Home">
           <Stack.Screen name="Home" component={HomeScreen} />
@@ -31,7 +32,6 @@ export default function App() {
         </Stack.Navigator>
          <Toast />
       </native.NavigationContainer>
-     
-    </>
+    </AuthProvider>
   );
 }

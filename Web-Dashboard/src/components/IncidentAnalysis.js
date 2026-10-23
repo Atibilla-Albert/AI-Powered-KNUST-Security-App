@@ -36,7 +36,7 @@ const IncidentAnalysis = ({ incident }) => {
         timestamp: incident.createdAt,
       });
       setRiskAnalysis(fraudResult);
-      console.log('Risk analysis result:', fraudResult);
+
 
       if (fraudResult.isSuspicious) {
         console.log('Sending SNS notification for suspicious incident:', incident.incidentId);
@@ -69,10 +69,7 @@ const IncidentAnalysis = ({ incident }) => {
       setTextAnalysis(textResult);
       */
     } catch (err) {
-      console.error('Error running analysis:', {
-        message: err.message,
-        response: err.response?.data,
-      });
+      console.error('Error running incident analysis', { status: err.response?.status });
       setError('Failed to run analysis');
     }
   };

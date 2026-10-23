@@ -5,7 +5,7 @@
 
 const defaultHeaders = {
   'Content-Type': 'application/json',
-  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Origin': process.env.CORS_ALLOWED_ORIGIN || 'http://localhost:3000',
   'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, PATCH, OPTIONS',
   'Access-Control-Allow-Headers': 'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Requested-With,X-Correlation-ID',
   'X-Content-Type-Options': 'nosniff',
@@ -70,14 +70,8 @@ const errorResponse = (message, statusCode = 500, details = {}, requestId) => {
     timestamp: new Date().toISOString(),
   };
 
-  // Log full error details including stack trace if available
-  console.error(`[API Error ${statusCode}]`, {
-    message,
-    statusCode,
-    details,
-    requestId,
-    stack: details.stack || new Error().stack,
-  });
+  // Avoid logging arbitrary error details or stack traces that may contain user data.
+  console.error('API error', { statusCode, requestId });
 
   return generateApiResponse(statusCode, {
     success: false,

@@ -49,26 +49,26 @@ async function getUserDetails(accessToken) {
 
 // Error handler
 const handleCognitoError = (error, operation) => {
-  console.error(`Cognito ${operation} error:`, {
-    message: error.message,
-    code: error.code,
-    stack: error.stack
-  });
+  const name = error.name || error.code || 'UnknownError';
+  console.warn(`Cognito ${operation} failed`, { code: name });
 
-  if (error.name === 'UsernameExistsException') {
-    return errorResponse('User already exists', 409);
-  }
-  if (error.name === 'NotAuthorizedException') {
-    return errorResponse('Invalid credentials', 401);
-  }
-  if (error.name === 'UserNotFoundException') {
-    return errorResponse('User not found', 404);
-  }
-  if (error.name === 'CodeMismatchException') {
-    return errorResponse('Invalid verification code', 400);
-  }
+  const publicError = (message, statusCode = 400) => {
+    const result = new Error(message);
+    result.statusCode = statusCode;
+    return result;
+  };
 
-  return errorResponse(error.message || `Cognito ${operation} failed`, 400);
+  if (name === 'UsernameExistsException') return publicError('An account with these details already exists.', 409);
+  if (name === 'NotAuthorizedException' || name === 'UserNotFoundException') {
+    return publicError('Invalid email or password.', 401);
+  }
+  if (name === 'CodeMismatchException' || name === 'ExpiredCodeException') {
+    return publicError('The verification code is invalid or expired.', 400);
+  }
+  if (name === 'UserNotConfirmedException') {
+    return publicError('Account confirmation is required before signing in.', 403);
+  }
+  return publicError(`Unable to complete ${operation}. Please try again.`, 400);
 };
 
 // Register user with required custom attributes
@@ -98,10 +98,6 @@ async function registerUser(email, password, attributes = {}) {
       Name: 'custom:lastName',
       Value: lastName
     },
-    {
-      Name: 'custom:role',
-      Value: attributes['custom:role'] || 'REGULAR_USER'
-    }
   ];
 
   const command = new SignUpCommand({
@@ -164,14 +160,21 @@ async function authenticate(email, password) {
 
   try {
     const response = await cognitoClient.send(command);
-    const user = await getUserDetails(response.AuthenticationResult.AccessToken);
-    // if (user['custom:role'] !== 'ADMIN') {
-    //   throw new Error('Unauthorized access');
-    // }
-    return {
-      ...response.AuthenticationResult,
-      role: user['custom:role']
-    };
+    // Role is a display hint only. Backend authorization uses verified Cognito
+    // group claims; never trust a client-supplied custom role attribute.
+    const accessToken = response.AuthenticationResult?.AccessToken || '';
+    let groups = [];
+    try {
+      const payload = JSON.parse(Buffer.from(accessToken.split('.')[1], 'base64url').toString('utf8'));
+      groups = Array.isArray(payload['cognito:groups']) ? payload['cognito:groups'] : [];
+    } catch { /* The API middleware performs authoritative JWT validation. */ }
+    const normalizedGroups = new Set(groups.map(group => String(group).toUpperCase()));
+    const role = normalizedGroups.has('ADMINISTRATORS') || normalizedGroups.has('ADMIN')
+      ? 'ADMIN'
+      : normalizedGroups.has('SECURITY_PERSONNEL') || normalizedGroups.has('SECURITYSTAFF') || normalizedGroups.has('SUPERVISORS')
+        ? 'SECURITY_PERSONNEL'
+        : 'REGULAR_USER';
+    return { ...response.AuthenticationResult, role };
   } catch (error) {
     throw handleCognitoError(error, 'authentication');
   }
@@ -217,7 +220,7 @@ async function forgotPasswordHandler(event) {
       body: JSON.stringify({ message: "Password reset code sent to email" })
     };
   } catch (error) {
-    return errorResponse(error.message || "Failed to send password reset code", 400);
+    return errorResponse("Unable to process the password reset request. If the account is eligible, instructions will be sent.", 400);
   }
 }
 
@@ -239,7 +242,7 @@ async function confirmForgotPasswordHandler(event) {
       body: JSON.stringify({ message: "Password has been reset successfully" })
     };
   } catch (error) {
-    return errorResponse(error.message || "Failed to reset password", 400);
+    return errorResponse("Unable to reset the password. Check the code and try again.", 400);
   }
 }
 
@@ -262,7 +265,7 @@ async function resendConfirmationCodeHandler(event) {
       body: JSON.stringify({ message: "Confirmation code resent successfully" })
     };
   } catch (error) {
-    return errorResponse(error.message || "Failed to resend confirmation code", 400);
+    return errorResponse("Unable to resend the confirmation code. Check the email and try again.", 400);
   }
 }
 
@@ -277,7 +280,8 @@ async function registerUserHandler(event) {
     // Auto-extract full name fields
     const firstName = attributes['custom:firstName'] || attributes.firstName || '';
     const lastName = attributes['custom:lastName'] || attributes.lastName || '';
-    const role = attributes['custom:role'] || attributes.role || 'REGULAR_USER';
+    // Public registration can only create regular users. Privileged roles must
+    // be assigned by an administrator through Cognito group membership.
 
     if (result && result.userId) {
       const user = new User({
@@ -285,7 +289,7 @@ async function registerUserHandler(event) {
         email,
         firstName,
         lastName,
-        role,
+        role: 'REGULAR_USER',
         cognitoId: result.userId
       });
 
@@ -300,7 +304,7 @@ async function registerUserHandler(event) {
       })
     };
   } catch (error) {
-    return errorResponse(error.message, 400);
+    return errorResponse(error.message || "Unable to complete the request.", error.statusCode || 400);
   }
 }
 
@@ -315,7 +319,7 @@ async function confirmRegistrationHandler(event) {
       body: JSON.stringify({ message: "User confirmed successfully" })
     };
   } catch (error) {
-    return errorResponse(error.message, 400);
+    return errorResponse(error.message || "Unable to complete the request.", error.statusCode || 400);
   }
 }
 

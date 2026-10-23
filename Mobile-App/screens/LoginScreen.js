@@ -12,12 +12,12 @@ import {
   Alert,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import Icon from 'react-native-vector-icons/MaterialIcons'; // For eye icon
-import { loginUser } from '../Services/api'; // Import the login API function
+import { useAuth } from '../authContext';
 
 export default function LoginScreen({ navigation }) {
   const isDark = useColorScheme() === 'dark';
+  const { signIn } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -26,26 +26,10 @@ export default function LoginScreen({ navigation }) {
   const handleLogin = async () => {
     setLoading(true);
     try {
-      const response = await loginUser({ email, password });
-      console.log("Login response:", response);
-
-      const tokens = response.data?.tokens;
-
-      const accessToken = tokens?.AccessToken || tokens?.accessToken;
-      const refreshToken = tokens?.RefreshToken || tokens?.refreshToken;
-      const idToken = tokens?.IdToken || tokens?.idToken;
-
-      if (!accessToken) {
-        throw new Error("Login succeeded but no token received.");
-      }
-
-      await AsyncStorage.setItem('accessToken', accessToken);
-      await AsyncStorage.setItem('refreshToken', refreshToken || '');
-      await AsyncStorage.setItem('idToken', idToken || '');
+      await signIn(email, password);
 
       navigation.navigate("Dashboard");
     } catch (err) {
-      console.log("Login error:", err);
       let errorMessage = "An unexpected error occurred. Please try again.";
 
       // Handle Axios errors
@@ -64,6 +48,7 @@ export default function LoginScreen({ navigation }) {
       } else if (err.message) {
         errorMessage = err.message;
       }
+
 
       Alert.alert("Login Failed", errorMessage);
     } finally {

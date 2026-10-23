@@ -20,8 +20,8 @@ const lambdaClient = new LambdaClient({ region: AWS_REGION });
 
 // Table names
 const TABLES = {
-  INCIDENTS: `${STAGE}-incidents`,
-  USERS: `${STAGE}-users`,
+  INCIDENTS: getEnvironmentVariable('INCIDENTS_TABLE_NAME', `${STAGE}-incidents`),
+  USERS: getEnvironmentVariable('USERS_TABLE_NAME', `${STAGE}-users`),
   ORGANIZATIONS: `${STAGE}-organizations`,
   NOTIFICATIONS: `${STAGE}-notifications`
 };
@@ -36,6 +36,7 @@ const BUCKETS = {
 const COGNITO = {
   USER_POOL_ID: getEnvironmentVariable('COGNITO_USER_POOL_ID'),
   USER_POOL_CLIENT_ID: getEnvironmentVariable('COGNITO_USER_POOL_CLIENT_ID'),
+  ISSUER_URL: getEnvironmentVariable('COGNITO_ISSUER_URL'),
   IDENTITY_POOL_ID: getEnvironmentVariable('COGNITO_IDENTITY_POOL_ID'),
   REGION: AWS_REGION
 };

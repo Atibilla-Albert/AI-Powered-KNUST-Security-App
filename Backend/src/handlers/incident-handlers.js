@@ -23,6 +23,13 @@ const s3 = new S3Client({ region: process.env.AWS_REGION || 'us-east-1' });
 const lambda = new LambdaClient({ region: process.env.AWS_REGION || 'us-east-1' });
 const BUCKET_NAME = process.env.S3_BUCKET || 'security-incident-reporting-dev-incident-media';
 
+const canReadIncident = (event, incident) => {
+  const user = event.authContext;
+  if (!user || !incident) return false;
+  if (user.role === 'ADMIN' || user.role === 'SECURITY_PERSONNEL') return true;
+  return user.id === incident.reporterId;
+};
+
 const supportedContentTypes = [
   'image/jpeg',
   'image/png',
@@ -58,7 +65,7 @@ const reportIncident = async (event) => {
         const reporterUser = User.fromDynamoItem(userItem);
         reporterName = reporterUser.toPublicJSON().fullName;
       } catch (err) {
-        console.warn('Failed to fetch reporter name from userRepo:', err);
+        console.warn('Failed to fetch reporter display name', { name: err.name || 'Error' });
         reporterName = `User ${reporterId}`;
       }
     }
@@ -76,7 +83,7 @@ const reportIncident = async (event) => {
     if (!location) {
       const ip = event.requestContext?.identity?.sourceIp;
       if (ip) {
-        const geo = await fetch(`http://ip-api.com/json/${ip}`).then(res => res.json());
+        const geo = await fetch(`https://ip-api.com/json/${encodeURIComponent(ip)}`).then(res => res.json());
         if (geo.status === 'success') {
           location = {
             latitude: geo.lat,
@@ -105,10 +112,10 @@ const reportIncident = async (event) => {
       createdAt: new Date().toISOString(),
     });
 
-    console.log('Creating incident:', JSON.stringify(incident.toDynamoItem(), null, 2));
+    console.info('Creating incident', { requestId: event.requestContext?.requestId || 'local-dev' });
     const savedIncident = await incidentRepo.createIncident(incident);
 
-    console.log('Invoking fraud assessment Lambda for incident:', savedIncident.incidentId);
+    console.info('Invoking fraud assessment Lambda');
     await lambda.send(new InvokeCommand({
       FunctionName: 'security-system-fraud-assessment',
       InvocationType: 'Event',
@@ -117,12 +124,12 @@ const reportIncident = async (event) => {
         reporter: { id: reporterId, name: reporterName },
       }),
     })).catch(err => {
-      console.error('Error invoking fraud assessment:', err);
+      console.error('Fraud assessment invocation failed', { name: err.name || 'Error' });
     });
 
     return generateApiResponse(201, { incidentId: savedIncident.incidentId, ...savedIncident.toPublicJSON() });
   } catch (error) {
-    console.error('Error reporting incident:', error);
+    console.error('Error reporting incident', { name: error.name || 'Error' });
     return generateApiResponse(400, { error: error.message });
   }
 };
@@ -131,7 +138,7 @@ const reportIncident = async (event) => {
  * Process new incident and trigger fraud assessment (used by POST /incidents/process)
  */
 const processNewIncident = async (event, context) => {
-  console.log('Processing new incident report:', JSON.stringify(event, null, 2));
+  console.info('Processing incident request', { requestId: event.requestContext?.requestId || 'local-dev' });
 
   try {
     const data = typeof event.body === 'string' ? JSON.parse(event.body) : event.body;
@@ -185,7 +192,7 @@ const processNewIncident = async (event, context) => {
 
     return generateApiResponse(201, { incidentId: savedIncident.incidentId, ...Incident.fromDynamoItem(savedIncident).toPublicJSON() });
   } catch (error) {
-    console.error('Error processing incident:', error);
+    console.error('Error processing incident', { name: error.name || 'Error' });
     return generateApiResponse(400, { error: error.message });
   }
 };
@@ -221,7 +228,7 @@ const getMediaUploadUrl = async (event) => {
     const url = await s3.send(new GetSignedUrlCommand({ ...params, Operation: 'putObject' }));
     return generateApiResponse(200, { url, key });
   } catch (error) {
-    console.error('Error generating upload URL:', error);
+    console.error('Error generating upload URL', { name: error.name || 'Error' });
     return generateApiResponse(500, { error: 'Failed to generate upload URL' });
   }
 };
@@ -244,7 +251,7 @@ const addAttachment = async (event) => {
     const updatedIncident = await incidentRepo.addAttachmentToIncident(incidentId, attachmentKey);
     return generateApiResponse(200, Incident.fromDynamoItem(updatedIncident).toPublicJSON());
   } catch (error) {
-    console.error('Error adding attachment:', error);
+    console.error('Error adding attachment', { name: error.name || 'Error' });
     return generateApiResponse(500, { error: 'Failed to add attachment' });
   }
 };
@@ -303,7 +310,7 @@ const listIncidents = async (event) => {
         queryParams.FilterExpression = conditions.join(' AND ');
       }
 
-      console.log('Query params:', JSON.stringify(queryParams, null, 2));
+      // Query parameters may contain user identifiers; do not log their values.
       items = await incidentRepo.getIncidentsByStatus(status.toUpperCase(), limit, null);
       items = items.items;
     } else {
@@ -353,19 +360,19 @@ const listIncidents = async (event) => {
         scanParams.FilterExpression = conditions.join(' AND ');
       }
 
-      console.log('Scan params:', JSON.stringify(scanParams, null, 2));
+      // Do not log query values or incident records.
       items = await scanTable(scanParams);
     }
 
     items = items.filter(item => item !== undefined);
-    console.log('Filtered queried items:', JSON.stringify(items, null, 2));
+    // Do not log incident records or personally identifiable information.
 
     let incidents = items.map(item => {
-      console.log('Processing item:', JSON.stringify(item, null, 2));
+
       if (!item) return null;
       try {
         const incident = Incident.fromDynamoItem(item);
-        console.log('Converted incident:', JSON.stringify(incident.toPublicJSON(), null, 2));
+
         return incident.toPublicJSON();
       } catch (error) {
         console.error(`Failed to process item ${item.incidentId || 'unknown'}: ${error.message}`);
@@ -408,7 +415,7 @@ const listIncidents = async (event) => {
       totalIncidents: incidents.length,
     });
   } catch (error) {
-    console.error('Error listing incidents:', error);
+    console.error('Error listing incidents', { name: error.name || 'Error' });
     return generateApiResponse(500, { error: 'Failed to list incidents', details: error.message });
   }
 };
@@ -443,7 +450,7 @@ const listMyIncidents = async (event) => {
 
     return generateApiResponse(200, myIncidents);
   } catch (error) {
-    console.error('Error fetching user incidents:', error);
+    console.error('Error fetching user incidents', { name: error.name || 'Error' });
     return generateApiResponse(500, { error: 'Failed to fetch user incidents' });
   }
 };
@@ -454,13 +461,12 @@ const listMyIncidents = async (event) => {
 const getIncident = async (event) => {
   try {
     const incidentId = event.pathParameters.id;
-    console.log('Fetching incident with incidentId:', incidentId);
-
     const item = await incidentRepo.getIncidentById(incidentId);
-    console.log('Fetched incident:', JSON.stringify(item?.toPublicJSON() || null, null, 2));
-
     if (!item) {
       return generateApiResponse(404, { error: 'Incident not found' });
+    }
+    if (!canReadIncident(event, item)) {
+      return generateApiResponse(403, { error: 'Forbidden' });
     }
 
     let reporterName = item.reporterName || 'Unknown';
@@ -473,15 +479,15 @@ const getIncident = async (event) => {
           await updateItem(TABLES.INCIDENTS, incidentId, { reporterName });
         }
       } catch (err) {
-        console.warn(`Failed to get reporter name for ID ${item.reporterId}:`, err);
+        console.warn('Failed to resolve incident reporter display name', { name: err.name || 'Error' });
       }
     }
 
     const incident = Incident.fromDynamoItem({ ...item.toDynamoItem(), reporterName });
     return generateApiResponse(200, incident.toPublicJSON());
   } catch (error) {
-    console.error('Error getting incident:', error);
-    return generateApiResponse(500, { error: 'Failed to get incident', details: error.message });
+    console.error('Error getting incident', { name: error.name || 'Error' });
+    return generateApiResponse(500, { error: 'Failed to get incident' });
   }
 };
 
@@ -500,7 +506,7 @@ const updateIncidentStatus = async (event) => {
     const updatedItem = await updateItem(TABLES.INCIDENTS, incidentId, updates);
     return generateApiResponse(200, Incident.fromDynamoItem(updatedItem).toPublicJSON());
   } catch (error) {
-    console.error('Error updating incident:', error);
+    console.error('Error updating incident', { name: error.name || 'Error' });
     return generateApiResponse(500, { error: 'Failed to update incident' });
   }
 };
@@ -514,7 +520,7 @@ const deleteIncident = async (event) => {
     await deleteItem(TABLES.INCIDENTS, incidentId);
     return generateApiResponse(204, {});
   } catch (error) {
-    console.error('Error deleting incident:', error);
+    console.error('Error deleting incident', { name: error.name || 'Error' });
     return generateApiResponse(500, { error: 'Failed to delete incident' });
   }
 };

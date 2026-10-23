@@ -1,11 +1,32 @@
 import axios from 'axios';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as SecureStore from 'expo-secure-store';
+import { Platform } from 'react-native';
 
 // ------------------ Configuration ------------------
 const API_BASE_URL =
-  typeof process !== 'undefined' && process.env?.API_BASE_URL
-    ? process.env.API_BASE_URL
-    : 'http://172.20.10.4:3000/dev'; // adjust for emulator vs device if needed
+  typeof process !== 'undefined' && process.env?.EXPO_PUBLIC_API_BASE_URL
+    ? process.env.EXPO_PUBLIC_API_BASE_URL
+    : (__DEV__ ? 'http://172.20.10.4:3000/dev' : '');
+
+if (!API_BASE_URL) {
+  throw new Error('EXPO_PUBLIC_API_BASE_URL must be configured for production.');
+}
+if (!__DEV__ && !API_BASE_URL.startsWith('https://')) {
+  throw new Error('Production API_BASE_URL must use HTTPS.');
+}
+
+// SecureStore uses platform-backed encrypted storage on iOS/Android. Web keeps
+// tokens in memory only; a page reload requires a new login rather than localStorage.
+const webTokenCache = new Map();
+const readToken = async (key) => Platform.OS === 'web'
+  ? (webTokenCache.get(key) || null)
+  : SecureStore.getItemAsync(key);
+const writeToken = async (key, value) => Platform.OS === 'web'
+  ? (webTokenCache.set(key, value), undefined)
+  : SecureStore.setItemAsync(key, value);
+const deleteToken = async (key) => Platform.OS === 'web'
+  ? webTokenCache.delete(key)
+  : SecureStore.deleteItemAsync(key);
 
 // ------------------ Axios instance ------------------
 const api = axios.create({
@@ -35,12 +56,17 @@ const withRetry = async (fn, retries = 2, baseDelay = 500) => {
 
 // ------------------ Token Helpers ------------------
 export const setTokens = async ({ accessToken, refreshToken }) => {
-  if (accessToken) await AsyncStorage.setItem('accessToken', accessToken);
-  if (refreshToken) await AsyncStorage.setItem('refreshToken', refreshToken);
+  if (accessToken) await writeToken('accessToken', accessToken);
+  if (refreshToken) await writeToken('refreshToken', refreshToken);
 };
 
+export const getTokens = async () => ({
+  accessToken: await readToken('accessToken'),
+  refreshToken: await readToken('refreshToken')
+});
+
 export const clearTokens = async () => {
-  await AsyncStorage.multiRemove(['accessToken', 'refreshToken']);
+  await Promise.all(['accessToken', 'refreshToken', 'idToken'].map(deleteToken));
 };
 
 export const forceLogout = async (navigation) => {
@@ -69,7 +95,8 @@ const processQueue = (error, token = null) => {
 // ------------------ Request Interceptor ------------------
 api.interceptors.request.use(
   async (config) => {
-    const token = await AsyncStorage.getItem('accessToken');
+    const isAuthEndpoint = String(config.url || '').startsWith('/auth/');
+    const token = isAuthEndpoint ? null : await readToken('accessToken');
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
       if (__DEV__) {
@@ -99,7 +126,7 @@ api.interceptors.response.use(
         url: res.config.url,
         method: res.config.method,
         status: res.status,
-        data: res.data,
+        // Response bodies may contain credentials or tokens; never log them.
       });
     }
     return res;
@@ -113,7 +140,7 @@ api.interceptors.response.use(
     const status = error.response?.status;
 
     // Handle 401 token refresh
-    if (status === 401 && !originalRequest._retry) {
+    if (status === 401 && !originalRequest._retry && !String(originalRequest.url || '').startsWith('/auth/')) {
       if (isRefreshing) {
         // Queue and wait for refresh to complete
         return new Promise((resolve, reject) => {
@@ -130,7 +157,7 @@ api.interceptors.response.use(
       isRefreshing = true;
 
       try {
-        const refreshToken = await AsyncStorage.getItem('refreshToken');
+        const refreshToken = await readToken('refreshToken');
         if (!refreshToken) {
           if (__DEV__) console.warn('No refresh token available. Forcing logout.');
           await clearTokens();
@@ -170,7 +197,7 @@ api.interceptors.response.use(
           console.error('Token refresh failed:', {
             message: e.message,
             status: e.response?.status,
-            data: e.response?.data,
+            // Response bodies may contain sensitive information; intentionally omitted.
           });
         }
 
@@ -202,7 +229,7 @@ api.interceptors.response.use(
         method: error.config?.method,
         status: error.response?.status,
         statusText: error.response?.statusText,
-        data: error.response?.data,
+        // Response bodies may contain sensitive information; intentionally omitted.
         message: error.message,
       });
     }
@@ -212,12 +239,12 @@ api.interceptors.response.use(
 
 // ------------------ AUTH API ------------------
 export const registerUser = (userData) => {
-  if (__DEV__) console.log('Registering user', { userData });
+  if (__DEV__) console.log('Registering user');
   return api.post('/auth/register', userData);
 };
 
 export const confirmRegistration = (data) => {
-  if (__DEV__) console.log('Confirming registration', { data });
+  if (__DEV__) console.log('Confirming registration');
   return api.post('/auth/confirm', data);
 };
 
@@ -248,18 +275,17 @@ export const refreshTokens = (refreshToken) => {
 
 // ------------------ INCIDENT API ------------------
 export const reportIncident = (incidentData) => {
-  if (__DEV__) console.log('Reporting incident', { incidentData });
+  if (__DEV__) console.log('Reporting incident');
   return api
     .post('/incidents', incidentData)
     .then((response) => {
-      if (__DEV__) console.log('Incident report successful', response.data);
+      if (__DEV__) console.log('Incident report successful');
       return response;
     })
     .catch((error) => {
       if (__DEV__) {
         console.error('Incident report failed:', {
           status: error.response?.status,
-          data: error.response?.data,
           message: error.message,
         });
       }
@@ -268,8 +294,9 @@ export const reportIncident = (incidentData) => {
 };
 
 export const getIncidents = () => {
-  if (__DEV__) console.log('Fetching all incidents');
-  return api.get('/incidents');
+  // Mobile users see their own reports; staff use the dedicated security endpoint.
+  if (__DEV__) console.log('Fetching current user incidents');
+  return api.get('/incidents/my');
 };
 
 export const getMyIncidents = () => {
@@ -290,14 +317,13 @@ export const getIncidentMediaUploadUrl = (incidentId, filename, contentType) => 
       contentType,
     })
     .then((response) => {
-      if (__DEV__) console.log('Upload URL received', response.data);
+      if (__DEV__) console.log('Upload URL received');
       return response;
     })
     .catch((error) => {
       if (__DEV__) {
         console.error('Failed to get upload URL:', {
           status: error.response?.status,
-          data: error.response?.data,
           message: error.message,
         });
       }
@@ -307,7 +333,7 @@ export const getIncidentMediaUploadUrl = (incidentId, filename, contentType) => 
 
 // Upload to S3 (pre-signed)
 export const uploadToS3 = async (presignedUrl, fileUri, contentType) => {
-  if (__DEV__) console.log('Uploading to S3', { presignedUrl, fileUri, contentType });
+  if (__DEV__) console.log('Uploading media to S3');
 
   const response = await fetch(fileUri);
   const blob = await response.blob();
@@ -321,11 +347,10 @@ export const uploadToS3 = async (presignedUrl, fileUri, contentType) => {
   });
 
   if (!uploadRes.ok) {
-    const text = await uploadRes.text();
     if (__DEV__) {
-      console.error('S3 upload failed', { status: uploadRes.status, text });
+      console.error('S3 upload failed', { status: uploadRes.status });
     }
-    throw new Error(`Failed to upload media to S3: ${uploadRes.status} ${text}`);
+    throw new Error(`Failed to upload media to S3 (HTTP ${uploadRes.status}).`);
   }
 
   if (__DEV__) console.log('S3 upload successful');
@@ -334,18 +359,17 @@ export const uploadToS3 = async (presignedUrl, fileUri, contentType) => {
 
 // Add attachment to incident
 export const addIncidentAttachment = (incidentId, key) => {
-  if (__DEV__) console.log('Adding attachment to incident', { incidentId, key });
+  if (__DEV__) console.log('Adding attachment to incident', { incidentId });
   return api
     .post(`/incidents/${incidentId}/media`, { key })
     .then((response) => {
-      if (__DEV__) console.log('Attachment added successfully', response.data);
+      if (__DEV__) console.log('Attachment added successfully');
       return response;
     })
     .catch((error) => {
       if (__DEV__) {
         console.error('Failed to add attachment:', {
           status: error.response?.status,
-          data: error.response?.data,
           message: error.message,
         });
       }
@@ -359,7 +383,7 @@ export const sendEmergencyAlert = async (
   opts = {}
 ) => {
   if (typeof latitude !== 'number' || typeof longitude !== 'number') {
-    if (__DEV__) console.error('Invalid emergency alert data', { latitude, longitude });
+    if (__DEV__) console.error('Invalid emergency alert coordinates');
     throw new Error('Latitude and longitude must be numbers');
   }
 
@@ -372,7 +396,7 @@ export const sendEmergencyAlert = async (
   };
 
   if (__DEV__) {
-    console.log('Sending emergency alert with data:', payload);
+    console.log('Sending emergency alert');
   }
 
   try {
@@ -385,7 +409,7 @@ export const sendEmergencyAlert = async (
         const errMsg = body?.error || 'Unexpected response shape from alert endpoint';
         throw new Error(errMsg);
       }
-      if (__DEV__) console.log('Emergency alert sent successfully', body);
+      if (__DEV__) console.log('Emergency alert sent successfully');
       return response;
     }
 
@@ -394,7 +418,6 @@ export const sendEmergencyAlert = async (
     if (__DEV__) {
       console.error('Emergency alert failed:', {
         status: error.response?.status,
-        data: error.response?.data,
         message: error.message,
         url: error.config?.url,
         method: error.config?.method,
