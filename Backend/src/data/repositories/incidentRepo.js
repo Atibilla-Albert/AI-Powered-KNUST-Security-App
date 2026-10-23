@@ -73,20 +73,33 @@ const updateIncident = async (incident) => {
   try {
     logger.info('Updating incident', { incidentId: incident.incidentId });
     incident.updatedAt = new Date().toISOString();
+    const item = incident.toDynamoItem();
+    
+    // Build update expression dynamically for all fields except the key
+    const updateExpressions = [];
+    const expressionAttributeNames = {};
+    const expressionAttributeValues = {};
+    
+    // Exclude incidentId from update (it's the key)
+    const fieldsToUpdate = Object.keys(item).filter(key => key !== 'incidentId');
+    
+    fieldsToUpdate.forEach((field, index) => {
+      const nameKey = `#field${index}`;
+      const valueKey = `:value${index}`;
+      updateExpressions.push(`${nameKey} = ${valueKey}`);
+      expressionAttributeNames[nameKey] = field;
+      expressionAttributeValues[valueKey] = item[field];
+    });
+    
     const params = {
       TableName: INCIDENTS_TABLE,
       Key: { incidentId: incident.incidentId },
-      UpdateExpression: 'SET #data = :data, #updatedAt = :updatedAt',
-      ExpressionAttributeNames: {
-        '#data': 'data',
-        '#updatedAt': 'updatedAt',
-      },
-      ExpressionAttributeValues: {
-        ':data': incident.toDynamoItem(),
-        ':updatedAt': incident.updatedAt,
-      },
+      UpdateExpression: `SET ${updateExpressions.join(', ')}`,
+      ExpressionAttributeNames: expressionAttributeNames,
+      ExpressionAttributeValues: expressionAttributeValues,
       ReturnValues: 'ALL_NEW',
     };
+    
     const result = await dynamodb.send(new UpdateCommand(params));
     logger.info('Incident updated', { incidentId: incident.incidentId });
     return Incident.fromDynamoItem(result.Attributes);
