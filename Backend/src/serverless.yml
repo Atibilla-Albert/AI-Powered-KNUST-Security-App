@@ -28,15 +28,16 @@ provider:
     DYNAMO_DB: ${self:custom.tableName}
     S3_BUCKET: ${self:custom.bucketName}
     SNS_TOPIC_ARN: !Ref IncidentAlertsTopic
-    COGNITO_USER_POOL_ID: us-east-1_d5YngXjKC
-    COGNITO_USER_POOL_CLIENT_ID: 72ncbq4u2avoqdmfd58likbt9e
+    COGNITO_USER_POOL_ID: ${env:COGNITO_USER_POOL_ID, 'us-east-1_d5YngXjKC'}
+    COGNITO_USER_POOL_CLIENT_ID: ${env:COGNITO_USER_POOL_CLIENT_ID, '72ncbq4u2avoqdmfd58likbt9e'}
+    COGNITO_ISSUER_URL: https://cognito-idp.${self:provider.region}.amazonaws.com/${env:COGNITO_USER_POOL_ID, 'us-east-1_d5YngXjKC'}
     STAGE: ${self:provider.stage}
     USERS_TABLE: dev-users
-    GEOCODING_API_KEY: 702de0e1d1f74fb6b4c024d029a9f6c1
+    GEOCODING_API_KEY: ${env:GEOCODING_API_KEY, ''}
     DEFAULT_SENDER_EMAIL: verified@email.com
     POWERTOOLS_SERVICE_NAME: ${self:service}
-    POWERTOOLS_TRACER_CAPTURE_RESPONSE: true
-    POWERTOOLS_TRACER_CAPTURE_ERROR: true
+    POWERTOOLS_TRACER_CAPTURE_RESPONSE: false
+    POWERTOOLS_TRACER_CAPTURE_ERROR: false
 
   iam:
     role:
@@ -101,13 +102,6 @@ functions:
               - X-Amz-Security-Token
               - X-Amz-User-Agent
             allowCredentials: false
-          authorizer:
-            type: COGNITO_USER_POOLS
-            authorizerId: !Ref ApiGatewayAuthorizer
-            scopes:
-              - email
-              - openid
-              - profile
 
   processHighCredibilityIncident:
     handler: index.processHighCredibilityIncident
@@ -304,16 +298,6 @@ resources:
           AccessToken: minutes
           IdToken: minutes
           RefreshToken: days
-
-    ApiGatewayAuthorizer:
-      Type: AWS::ApiGateway::Authorizer
-      Properties:
-        Name: ${self:custom.authorizerName}
-        Type: COGNITO_USER_POOLS
-        IdentitySource: method.request.header.Authorization
-        RestApiId: !Ref ApiGatewayRestApi
-        ProviderARNs:
-          - !GetAtt CognitoUserPoolV2.Arn
 
 outputs:
   CognitoUserPoolId:
