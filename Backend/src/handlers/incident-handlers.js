@@ -23,6 +23,13 @@ const s3 = new S3Client({ region: process.env.AWS_REGION || 'us-east-1' });
 const lambda = new LambdaClient({ region: process.env.AWS_REGION || 'us-east-1' });
 const BUCKET_NAME = process.env.S3_BUCKET || 'security-incident-reporting-dev-incident-media';
 
+const canReadIncident = (event, incident) => {
+  const user = event.authContext;
+  if (!user || !incident) return false;
+  if (user.role === 'ADMIN' || user.role === 'SECURITY_PERSONNEL') return true;
+  return user.id === incident.reporterId;
+};
+
 const supportedContentTypes = [
   'image/jpeg',
   'image/png',
@@ -454,13 +461,12 @@ const listMyIncidents = async (event) => {
 const getIncident = async (event) => {
   try {
     const incidentId = event.pathParameters.id;
-    console.log('Fetching incident with incidentId:', incidentId);
-
     const item = await incidentRepo.getIncidentById(incidentId);
-    console.log('Fetched incident:', JSON.stringify(item?.toPublicJSON() || null, null, 2));
-
     if (!item) {
       return generateApiResponse(404, { error: 'Incident not found' });
+    }
+    if (!canReadIncident(event, item)) {
+      return generateApiResponse(403, { error: 'Forbidden' });
     }
 
     let reporterName = item.reporterName || 'Unknown';
@@ -473,15 +479,15 @@ const getIncident = async (event) => {
           await updateItem(TABLES.INCIDENTS, incidentId, { reporterName });
         }
       } catch (err) {
-        console.warn(`Failed to get reporter name for ID ${item.reporterId}:`, err);
+        console.warn('Failed to resolve incident reporter display name', { name: err.name || 'Error' });
       }
     }
 
     const incident = Incident.fromDynamoItem({ ...item.toDynamoItem(), reporterName });
     return generateApiResponse(200, incident.toPublicJSON());
   } catch (error) {
-    console.error('Error getting incident:', error);
-    return generateApiResponse(500, { error: 'Failed to get incident', details: error.message });
+    console.error('Error getting incident', { name: error.name || 'Error' });
+    return generateApiResponse(500, { error: 'Failed to get incident' });
   }
 };
 
