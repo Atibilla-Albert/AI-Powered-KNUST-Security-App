@@ -36,6 +36,7 @@ const BUCKETS = {
 const COGNITO = {
   USER_POOL_ID: getEnvironmentVariable('COGNITO_USER_POOL_ID'),
   USER_POOL_CLIENT_ID: getEnvironmentVariable('COGNITO_USER_POOL_CLIENT_ID'),
+  ISSUER_URL: getEnvironmentVariable('COGNITO_ISSUER_URL'),
   IDENTITY_POOL_ID: getEnvironmentVariable('COGNITO_IDENTITY_POOL_ID'),
   REGION: AWS_REGION
 };
