@@ -12,7 +12,7 @@ import {
   Alert,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { setTokens } from '../Services/api';
 import Icon from 'react-native-vector-icons/MaterialIcons'; // For eye icon
 import { loginUser } from '../Services/api'; // Import the login API function
 
@@ -27,25 +27,20 @@ export default function LoginScreen({ navigation }) {
     setLoading(true);
     try {
       const response = await loginUser({ email, password });
-      console.log("Login response:", response);
 
       const tokens = response.data?.tokens;
 
       const accessToken = tokens?.AccessToken || tokens?.accessToken;
       const refreshToken = tokens?.RefreshToken || tokens?.refreshToken;
-      const idToken = tokens?.IdToken || tokens?.idToken;
 
       if (!accessToken) {
         throw new Error("Login succeeded but no token received.");
       }
 
-      await AsyncStorage.setItem('accessToken', accessToken);
-      await AsyncStorage.setItem('refreshToken', refreshToken || '');
-      await AsyncStorage.setItem('idToken', idToken || '');
+      await setTokens({ accessToken, refreshToken });
 
       navigation.navigate("Dashboard");
     } catch (err) {
-      console.log("Login error:", err);
       let errorMessage = "An unexpected error occurred. Please try again.";
 
       // Handle Axios errors
