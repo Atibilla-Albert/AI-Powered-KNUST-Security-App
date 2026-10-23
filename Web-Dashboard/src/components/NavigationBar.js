@@ -5,12 +5,14 @@ import { Link, useNavigate } from 'react-router-dom';
 import MenuIcon from '@mui/icons-material/Menu';
 import LogoutIcon from '@mui/icons-material/Logout';
 import SecurityIcon from '@mui/icons-material/Security';
+import { useAuth} from '../contexts/AuthContext';
 
 const NavigationBar = () => {
 
   const navigate = useNavigate();
   const [anchorEl, setAnchorEl] = React.useState(null);
   const open = Boolean(anchorEl);
+  const { isAuthenticated, signOut } = useAuth();
 
   const handleMenuClick = (event) => {
     setAnchorEl(event.currentTarget);
@@ -26,11 +28,16 @@ const NavigationBar = () => {
     // Example: navigate(`/departments/${department}`);
   };
 
-  const handleLogout = () => {
-    // add your auth logout logic here
-    localStorage.clear();
+  const handleLogout = async() => {
+  try {  
+    await signOut();
     navigate('/login');
-  };
+  } catch (err) {
+    console.error('Logout failed:', err);
+  }
+};
+
+if (!isAuthenticated) return null;
 
   return (
     <AppBar position="static" sx={{ backgroundColor: '#219653' }}>
@@ -39,19 +46,7 @@ const NavigationBar = () => {
           <IconButton size="large" edge="start" color="inherit" onClick={handleMenuClick}>
             <MenuIcon />
           </IconButton>
-          <Menu
-            anchorEl={anchorEl}
-            open={open}
-            onClose={handleMenuClose}
-          >
-            <MenuItem onClick={() => handleDepartmentSelect('Police')}>Police</MenuItem>
-            <MenuItem onClick={() => handleDepartmentSelect('Electricals/Air condition')}>Electricals/Air Condition</MenuItem>
-            <MenuItem onClick={() => handleDepartmentSelect('Road-worth')}>Road Worth</MenuItem>
-            <MenuItem onClick={() => handleDepartmentSelect('Wood-works')}>Wood Works</MenuItem>
-            <MenuItem onClick={() => handleDepartmentSelect('Fire-Safety')}>Fire Safety</MenuItem>
-            <MenuItem onClick={() => handleDepartmentSelect('Mechanical')}>Mechanical</MenuItem>
-            <MenuItem onClick={() => handleDepartmentSelect('Civil')}>Civil</MenuItem>
-          </Menu>
+          
           <SecurityIcon sx={{ mr: 1 }} />
           <Typography variant="h6" component={Link} to="/" sx={{ textDecoration: 'none', color: 'inherit' }}>
             CAMPSEC KNUST
