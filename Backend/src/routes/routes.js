@@ -68,7 +68,7 @@ const defineRoutes = () => ({
     get: { handler: loggingMiddleware(incidentHandlers.listIncidents), middleware: [lambdaAuthenticate, lambdaAuthorize([USER_ROLES.SECURITY_PERSONNEL, USER_ROLES.ADMIN])] },
   },
   '/incidents/:id': { // Changed from :incidentId to :id for consistency
-    get: { handler: loggingMiddleware(incidentHandlers.getIncident), middleware: [lambdaAuthenticate, lambdaAuthorize([USER_ROLES.SECURITY_PERSONNEL, USER_ROLES.ADMIN])] },
+    get: { handler: loggingMiddleware(incidentHandlers.getIncident), middleware: [lambdaAuthenticate] },
     put: { handler: loggingMiddleware(incidentHandlers.updateIncidentStatus), middleware: [lambdaAuthenticate, lambdaAuthorize([USER_ROLES.SECURITY_PERSONNEL, USER_ROLES.ADMIN])] },
     delete: { handler: loggingMiddleware(incidentHandlers.deleteIncident), middleware: [lambdaAuthenticate, lambdaAuthorize([USER_ROLES.ADMIN])] },
   },
