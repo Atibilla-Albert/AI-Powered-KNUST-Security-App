@@ -72,7 +72,8 @@ export const incidentService = {
   async assignIncident(incidentId, departmentId, notes = '') {
     try {
       // Backend expects POST /incidents/:id/assign with { departmentId, notes }
-      return await apiService.post(`/incidents/${incidentId}/assign`, { departmentId, notes });
+      const normalizedDeptId = (departmentId || '').toString().toUpperCase();
+      return await apiService.post(`/incidents/${incidentId}/assign`, { departmentId: normalizedDeptId, notes });
     } catch (error) {
       console.error(`Error assigning incident ${incidentId} to department ${departmentId}:`, error?.response?.data || error.message);
       throw error;
