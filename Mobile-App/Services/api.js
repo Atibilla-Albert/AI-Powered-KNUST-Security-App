@@ -280,7 +280,6 @@ export const reportIncident = (incidentData) => {
       if (__DEV__) {
         console.error('Incident report failed:', {
           status: error.response?.status,
-          data: error.response?.data,
           message: error.message,
         });
       }
@@ -318,7 +317,6 @@ export const getIncidentMediaUploadUrl = (incidentId, filename, contentType) => 
       if (__DEV__) {
         console.error('Failed to get upload URL:', {
           status: error.response?.status,
-          data: error.response?.data,
           message: error.message,
         });
       }
@@ -344,7 +342,7 @@ export const uploadToS3 = async (presignedUrl, fileUri, contentType) => {
   if (!uploadRes.ok) {
     const text = await uploadRes.text();
     if (__DEV__) {
-      console.error('S3 upload failed', { status: uploadRes.status, text });
+      console.error('S3 upload failed', { status: uploadRes.status });
     }
     throw new Error(`Failed to upload media to S3: ${uploadRes.status} ${text}`);
   }
