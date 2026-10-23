@@ -28,9 +28,9 @@ provider:
     DYNAMO_DB: ${self:custom.tableName}
     S3_BUCKET: ${self:custom.bucketName}
     SNS_TOPIC_ARN: !Ref IncidentAlertsTopic
-    COGNITO_USER_POOL_ID: ${env:COGNITO_USER_POOL_ID, 'us-east-1_d5YngXjKC'}
-    COGNITO_USER_POOL_CLIENT_ID: ${env:COGNITO_USER_POOL_CLIENT_ID, '72ncbq4u2avoqdmfd58likbt9e'}
-    COGNITO_ISSUER_URL: https://cognito-idp.${self:provider.region}.amazonaws.com/${env:COGNITO_USER_POOL_ID, 'us-east-1_d5YngXjKC'}
+    COGNITO_USER_POOL_ID: ${env:COGNITO_USER_POOL_ID}
+    COGNITO_USER_POOL_CLIENT_ID: ${env:COGNITO_USER_POOL_CLIENT_ID}
+    COGNITO_ISSUER_URL: https://cognito-idp.${self:provider.region}.amazonaws.com/${env:COGNITO_USER_POOL_ID}
     STAGE: ${self:provider.stage}
     USERS_TABLE: dev-users
     GEOCODING_API_KEY: ${env:GEOCODING_API_KEY, ''}
