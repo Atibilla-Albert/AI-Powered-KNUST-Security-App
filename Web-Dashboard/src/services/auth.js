@@ -26,7 +26,7 @@ const decodeClaimsForDisplayOnly = (token) => {
 export const authService = {
   async signIn(username, password) {
     try {
-      const response = await axios.post(\`\${BASE_URL}/auth/login\`, {
+      const response = await axios.post(`${BASE_URL}/auth/login`, {
         email: username,
         password
       });
@@ -92,7 +92,7 @@ export const authService = {
   },
 
   getAuthHeader() {
-    return accessToken ? { Authorization: \`Bearer \${accessToken}\` } : {};
+    return accessToken ? { Authorization: `Bearer ${accessToken}` } : {};
   },
 
   getCurrentUser() {
