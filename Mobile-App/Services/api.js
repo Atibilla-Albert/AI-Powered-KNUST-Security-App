@@ -95,7 +95,8 @@ const processQueue = (error, token = null) => {
 // ------------------ Request Interceptor ------------------
 api.interceptors.request.use(
   async (config) => {
-    const token = await readToken('accessToken');
+    const isAuthEndpoint = String(config.url || '').startsWith('/auth/');
+    const token = isAuthEndpoint ? null : await readToken('accessToken');
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
       if (__DEV__) {
@@ -346,7 +347,6 @@ export const uploadToS3 = async (presignedUrl, fileUri, contentType) => {
   });
 
   if (!uploadRes.ok) {
-    const text = await uploadRes.text();
     if (__DEV__) {
       console.error('S3 upload failed', { status: uploadRes.status });
     }
