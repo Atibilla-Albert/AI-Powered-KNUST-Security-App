@@ -26,6 +26,8 @@ provider:
 
   environment:
     DYNAMO_DB: ${self:custom.tableName}
+    INCIDENTS_TABLE_NAME: ${self:custom.tableName}
+    USERS_TABLE_NAME: dev-users
     S3_BUCKET: ${self:custom.bucketName}
     SNS_TOPIC_ARN: !Ref IncidentAlertsTopic
     COGNITO_USER_POOL_ID: ${env:COGNITO_USER_POOL_ID}
