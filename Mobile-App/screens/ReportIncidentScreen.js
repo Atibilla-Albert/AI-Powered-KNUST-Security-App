@@ -15,8 +15,15 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import DropDownPicker from 'react-native-dropdown-picker';
 import * as ImagePicker from 'expo-image-picker';
-import { Audio } from 'expo-av';
-import { Video } from 'expo-av';
+import {
+  useAudioRecorder,
+  useAudioRecorderState,
+  RecordingPresets,
+  setAudioModeAsync,
+  requestRecordingPermissionsAsync,
+  createAudioPlayer,
+} from 'expo-audio';
+import { useVideoPlayer, VideoView } from 'expo-video';
 import mime from 'mime';
 import { Ionicons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
@@ -27,6 +34,22 @@ import {
   addIncidentAttachment,
 } from '../Services/api';
 import FloatingSOSButton from './Emergency';
+
+function VideoPreview({ uri }) {
+  const player = useVideoPlayer(uri, (videoPlayer) => {
+    videoPlayer.loop = false;
+    videoPlayer.pause();
+  });
+
+  return (
+    <VideoView
+      player={player}
+      style={styles.media}
+      nativeControls
+      contentFit="cover"
+    />
+  );
+}
 
 export default function ReportScreen({ navigation }) {
   const [colorScheme, setColorScheme] = useState(Appearance.getColorScheme() || 'light');
@@ -43,10 +66,11 @@ export default function ReportScreen({ navigation }) {
   const [severity, setSeverity] = useState('low');
   const [incidentType, setIncidentType] = useState(null);
   const [media, setMedia] = useState([]);
-  const [recording, setRecording] = useState(null);
   const [audioUri, setAudioUri] = useState(null);
   const [uploading, setUploading] = useState(false);
   const [sound, setSound] = useState(null);
+  const audioRecorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
+  const recorderState = useAudioRecorderState(audioRecorder);
   const [severityOpen, setSeverityOpen] = useState(false);
   const [typeOpen, setTypeOpen] = useState(false);
   const [location, setLocation] = useState(null);
@@ -94,7 +118,7 @@ export default function ReportScreen({ navigation }) {
       if (!hasPermission) return;
 
       const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.All,
+        mediaTypes: ['images', 'videos'],
         allowsMultipleSelection: true,
         quality: 0.7,
         videoMaxDuration: 60,
@@ -132,7 +156,7 @@ export default function ReportScreen({ navigation }) {
       if (!hasPermission) return;
 
       const result = await ImagePicker.launchCameraAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.All,
+        mediaTypes: ['images', 'videos'],
         allowsEditing: true,
         quality: 0.7,
         videoMaxDuration: 60,
@@ -168,71 +192,19 @@ export default function ReportScreen({ navigation }) {
 
   const startRecording = async () => {
     try {
-      console.log('Requesting recording permissions...');
-      
-      let permissionResponse;
-      try {
-        permissionResponse = await Audio.requestPermissionsAsync();
-      } catch (permError) {
-        console.log('Standard permission request failed, trying alternative...');
-        try {
-          permissionResponse = await Audio.getPermissionsAsync();
-          if (!permissionResponse.granted) {
-            permissionResponse = await Audio.requestPermissionsAsync();
-          }
-        } catch (altError) {
-          console.error('Alternative permission method also failed:', altError);
-          Alert.alert('Permission Error', 'Unable to request microphone permissions. Please check your expo-av installation.');
-          return;
-        }
-      }
-
-      if (permissionResponse.status !== 'granted' && !permissionResponse.granted) {
+      const permissionResponse = await requestRecordingPermissionsAsync();
+      if (!permissionResponse.granted) {
         Alert.alert('Permission Needed', 'Microphone access is required to record audio.');
         return;
       }
 
-      console.log('Setting audio mode...');
-      await Audio.setAudioModeAsync({
-        allowsRecordingIOS: true,
-        playsInSilentModeIOS: true,
-        staysActiveInBackground: false,
-        shouldDuckAndroid: true,
-        playThroughEarpieceAndroid: false,
+      await setAudioModeAsync({
+        allowsRecording: true,
+        playsInSilentMode: true,
       });
 
-      console.log('Creating recording...');
-      let recordingOptions;
-      try {
-        recordingOptions = Audio.RECORDING_OPTIONS_PRESET_HIGH_QUALITY;
-      } catch (presetError) {
-        console.log('Using custom recording options...');
-        recordingOptions = {
-          android: {
-            extension: '.m4a',
-            outputFormat: Audio.RECORDING_OPTION_ANDROID_OUTPUT_FORMAT_MPEG_4,
-            audioEncoder: Audio.RECORDING_OPTION_ANDROID_AUDIO_ENCODER_AAC,
-            sampleRate: 44100,
-            numberOfChannels: 2,
-            bitRate: 128000,
-          },
-          ios: {
-            extension: '.m4a',
-            outputFormat: Audio.RECORDING_OPTION_IOS_OUTPUT_FORMAT_MPEG4AAC,
-            audioQuality: Audio.RECORDING_OPTION_IOS_AUDIO_QUALITY_HIGH,
-            sampleRate: 44100,
-            numberOfChannels: 2,
-            bitRate: 128000,
-            linearPCMBitDepth: 16,
-            linearPCMIsBigEndian: false,
-            linearPCMIsFloat: false,
-          },
-        };
-      }
-
-      const { recording } = await Audio.Recording.createAsync(recordingOptions);
-      setRecording(recording);
-      console.log('Recording started successfully');
+      await audioRecorder.prepareToRecordAsync();
+      audioRecorder.record();
     } catch (err) {
       console.error('Start recording failed:', err);
       Alert.alert('Recording Error', `Could not start recording: ${err.message}`);
@@ -240,17 +212,14 @@ export default function ReportScreen({ navigation }) {
   };
 
   const stopRecording = async () => {
-    if (!recording) {
-      console.log('No recording to stop');
+    if (!recorderState.isRecording) {
       return;
     }
 
     try {
-      console.log('Stopping recording...');
-      await recording.stopAndUnloadAsync();
-      const uri = recording.getURI();
-      console.log('Recording stopped, URI:', uri);
-      
+      await audioRecorder.stop();
+      const uri = audioRecorder.uri;
+
       if (uri) {
         setAudioUri(uri);
         Alert.alert('Success', 'Voice recording saved successfully!');
@@ -261,12 +230,10 @@ export default function ReportScreen({ navigation }) {
       console.error('Stop recording failed:', err);
       Alert.alert('Recording Error', `Could not save recording: ${err.message}`);
     } finally {
-      setRecording(null);
       try {
-        await Audio.setAudioModeAsync({
-          allowsRecordingIOS: false,
-          playsInSilentModeIOS: true,
-          staysActiveInBackground: false,
+        await setAudioModeAsync({
+          allowsRecording: false,
+          playsInSilentMode: true,
         });
       } catch (resetError) {
         console.error('Failed to reset audio mode:', resetError);
@@ -275,7 +242,7 @@ export default function ReportScreen({ navigation }) {
   };
 
   const toggleRecording = () => {
-    if (recording) stopRecording();
+    if (recorderState.isRecording) stopRecording();
     else startRecording();
   };
 
@@ -286,58 +253,26 @@ export default function ReportScreen({ navigation }) {
     }
 
     try {
-      console.log('Playing recording from:', audioUri);
       if (sound) {
-        await sound.unloadAsync();
+        sound.release();
         setSound(null);
       }
 
-      try {
-        const playbackConfig = {
-          allowsRecordingIOS: false,
-          playsInSilentModeIOS: true,
-          staysActiveInBackground: false,
-        };
-        if (Audio && typeof Audio.setAudioModeAsync === 'function') {
-          await Audio.setAudioModeAsync(playbackConfig);
-        } else if (AudioModule && typeof AudioModule.setAudioModeAsync === 'function') {
-          await AudioModule.setAudioModeAsync(playbackConfig);
-        }
-      } catch (modeError) {
-        console.log('Audio mode setting failed for playback, continuing anyway:', modeError);
-      }
+      await setAudioModeAsync({
+        allowsRecording: false,
+        playsInSilentMode: true,
+      });
 
-      let newSound;
-      try {
-        if (Audio && Audio.Sound) {
-          const soundResult = await Audio.Sound.createAsync(
-            { uri: audioUri },
-            { shouldPlay: true, isLooping: false }
-          );
-          newSound = soundResult.sound;
-        } else if (AudioModule && AudioModule.Sound) {
-          const soundResult = await AudioModule.Sound.createAsync(
-            { uri: audioUri },
-            { shouldPlay: true, isLooping: false }
-          );
-          newSound = soundResult.sound;
-        } else {
-          throw new Error('No Sound class available');
-        }
-      } catch (soundError) {
-        console.error('Sound creation failed:', soundError);
-        throw new Error(`Could not create sound: ${soundError.message}`);
-      }
-      
-      setSound(newSound);
-      newSound.setOnPlaybackStatusUpdate((status) => {
+      const player = createAudioPlayer({ uri: audioUri });
+      player.loop = false;
+      player.play();
+      setSound(player);
+      player.addListener('playbackStatusUpdate', (status) => {
         if (status.didJustFinish) {
-          console.log('Playback finished');
-          newSound.unloadAsync();
+          player.release();
           setSound(null);
         }
       });
-
     } catch (err) {
       console.error('Error playing recording:', err);
       Alert.alert('Playback Error', `Could not play recording: ${err.message}`);
@@ -346,7 +281,7 @@ export default function ReportScreen({ navigation }) {
 
   const removeAudio = () => {
     if (sound) {
-      sound.unloadAsync();
+      sound.release();
       setSound(null);
     }
     setAudioUri(null);
@@ -354,7 +289,7 @@ export default function ReportScreen({ navigation }) {
   };
 
   useEffect(() => {
-    return sound ? () => sound.unloadAsync() : undefined;
+    return sound ? () => sound.release() : undefined;
   }, [sound]);
 
   const extractFileName = (uri) => {
@@ -437,7 +372,6 @@ export default function ReportScreen({ navigation }) {
       setDescription('');
       setMedia([]);
       setAudioUri(null);
-      setRecording(null);
       setSound(null);
       setSeverity('low');
       setIncidentType(null);
@@ -484,14 +418,14 @@ export default function ReportScreen({ navigation }) {
             />
             <TouchableOpacity onPress={toggleRecording} style={styles.micButton}>
               <Ionicons
-                name={recording ? 'stop' : 'mic'}
+                name={recorderState.isRecording ? 'stop' : 'mic'}
                 size={24}
-                color={recording ? 'red' : isDark ? '#7ed957' : '#004225'}
+                color={recorderState.isRecording ? 'red' : isDark ? '#7ed957' : '#004225'}
               />
             </TouchableOpacity>
           </View>
 
-          {recording && (
+          {recorderState.isRecording && (
             <View style={styles.recordingIndicator}>
               <View style={styles.recordingDot} />
               <Text style={[styles.recordingText, { color: isDark ? '#7ed957' : '#004225' }]}>
@@ -578,13 +512,7 @@ export default function ReportScreen({ navigation }) {
           {media.map((item, idx) => (
             <View key={idx} style={styles.mediaContainer}>
               {item.type === 'video' ? (
-                <Video
-                  source={{ uri: item.uri }}
-                  style={styles.media}
-                  useNativeControls
-                  resizeMode="cover"
-                  shouldPlay={false}
-                />
+                <VideoPreview uri={item.uri} />
               ) : (
                 <Image source={{ uri: item.uri }} style={styles.media} />
               )}
