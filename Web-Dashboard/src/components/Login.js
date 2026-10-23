@@ -1,13 +1,14 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Navigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useForm } from '../hooks/useCustomHooks';
 import '../styles/Login.css';
 
 const Login = () => {
-  const { signIn, loading: isLoading, error: authError } = useAuth();
+  const { signIn, loading: isLoading, error: authError, isAuthenticated } = useAuth();
   const [showPassword, setShowPassword] = useState(false);
   const navigate = useNavigate();
+
 
   const validate = (values) => {
     const errors = {};
@@ -33,6 +34,10 @@ const Login = () => {
     validate
   );
 
+  if(isAuthenticated) {
+    return <Navigate to="/dashboard" replace />;
+  }
+  
  const handleLogin = async (formValues) => {
   try {
     const user = await signIn(formValues.username, formValues.password);
