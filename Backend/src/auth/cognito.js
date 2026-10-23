@@ -49,11 +49,7 @@ async function getUserDetails(accessToken) {
 
 // Error handler
 const handleCognitoError = (error, operation) => {
-  console.error(`Cognito ${operation} error:`, {
-    message: error.message,
-    code: error.code,
-    stack: error.stack
-  });
+  console.warn(`Cognito ${operation} failed`, { code: error.name || error.code || 'UnknownError' });
 
   if (error.name === 'UsernameExistsException') {
     return errorResponse('User already exists', 409);
@@ -98,10 +94,6 @@ async function registerUser(email, password, attributes = {}) {
       Name: 'custom:lastName',
       Value: lastName
     },
-    {
-      Name: 'custom:role',
-      Value: attributes['custom:role'] || 'REGULAR_USER'
-    }
   ];
 
   const command = new SignUpCommand({
@@ -164,14 +156,21 @@ async function authenticate(email, password) {
 
   try {
     const response = await cognitoClient.send(command);
-    const user = await getUserDetails(response.AuthenticationResult.AccessToken);
-    // if (user['custom:role'] !== 'ADMIN') {
-    //   throw new Error('Unauthorized access');
-    // }
-    return {
-      ...response.AuthenticationResult,
-      role: user['custom:role']
-    };
+    // Role is a display hint only. Backend authorization uses verified Cognito
+    // group claims; never trust a client-supplied custom role attribute.
+    const accessToken = response.AuthenticationResult?.AccessToken || '';
+    let groups = [];
+    try {
+      const payload = JSON.parse(Buffer.from(accessToken.split('.')[1], 'base64url').toString('utf8'));
+      groups = Array.isArray(payload['cognito:groups']) ? payload['cognito:groups'] : [];
+    } catch { /* The API middleware performs authoritative JWT validation. */ }
+    const normalizedGroups = new Set(groups.map(group => String(group).toUpperCase()));
+    const role = normalizedGroups.has('ADMINISTRATORS') || normalizedGroups.has('ADMIN')
+      ? 'ADMIN'
+      : normalizedGroups.has('SECURITY_PERSONNEL') || normalizedGroups.has('SECURITYSTAFF') || normalizedGroups.has('SUPERVISORS')
+        ? 'SECURITY_PERSONNEL'
+        : 'REGULAR_USER';
+    return { ...response.AuthenticationResult, role };
   } catch (error) {
     throw handleCognitoError(error, 'authentication');
   }
@@ -277,7 +276,8 @@ async function registerUserHandler(event) {
     // Auto-extract full name fields
     const firstName = attributes['custom:firstName'] || attributes.firstName || '';
     const lastName = attributes['custom:lastName'] || attributes.lastName || '';
-    const role = attributes['custom:role'] || attributes.role || 'REGULAR_USER';
+    // Public registration can only create regular users. Privileged roles must
+    // be assigned by an administrator through Cognito group membership.
 
     if (result && result.userId) {
       const user = new User({
@@ -285,7 +285,7 @@ async function registerUserHandler(event) {
         email,
         firstName,
         lastName,
-        role,
+        role: 'REGULAR_USER',
         cognitoId: result.userId
       });
 
