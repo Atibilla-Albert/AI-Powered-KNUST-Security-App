@@ -18,7 +18,7 @@ function assertAuthConfiguration() {
   if (!issuer || !clientId || !COGNITO.USER_POOL_ID) {
     throw new Error("Cognito authentication configuration is incomplete");
   }
-  const expectedIssuer = \`https://cognito-idp.\${COGNITO.REGION}.amazonaws.com/\${COGNITO.USER_POOL_ID}\`;
+  const expectedIssuer = `https://cognito-idp.${COGNITO.REGION}.amazonaws.com/${COGNITO.USER_POOL_ID}`;
   if (issuer !== expectedIssuer) {
     throw new Error("COGNITO_ISSUER_URL does not match configured User Pool and region");
   }
@@ -29,7 +29,7 @@ async function getJwks(retryCount = 0) {
   if (jwksCache && Date.now() - cacheTime < CACHE_DURATION_MS) return jwksCache;
 
   try {
-    const response = await axios.get(\`\${issuer}/.well-known/jwks.json\`, {
+    const response = await axios.get(`${issuer}/.well-known/jwks.json`, {
       timeout: 3000,
       headers: { Accept: "application/json" }
     });
