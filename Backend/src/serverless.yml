@@ -93,7 +93,7 @@ functions:
           path: /{proxy+}
           method: any
           cors:
-            origin: "*"
+            origin: ${env:CORS_ALLOWED_ORIGIN, 'http://localhost:3000'}
             headers:
               - Content-Type
               - X-Amz-Date
