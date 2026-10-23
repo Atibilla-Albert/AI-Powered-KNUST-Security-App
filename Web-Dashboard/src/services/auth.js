@@ -1,117 +1,102 @@
 import axios from 'axios';
 
-const BASE_URL = 'http://localhost:3000/dev'; // Update if your backend is deployed elsewhere
+const BASE_URL =
+  (typeof process !== 'undefined' && process.env.REACT_APP_API_BASE_URL) ||
+  (process.env.NODE_ENV === 'development' ? 'http://localhost:3000/dev' : '');
+
+if (!BASE_URL) {
+  throw new Error('REACT_APP_API_BASE_URL must be configured for production.');
+}
+if (process.env.NODE_ENV === 'production' && !BASE_URL.startsWith('https://')) {
+  throw new Error('The production API URL must use HTTPS.');
+}
+
+let accessToken = null;
+let currentUser = null;
+
+const decodeClaimsForDisplayOnly = (token) => {
+  try {
+    const payload = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
+    return JSON.parse(atob(payload));
+  } catch {
+    return {};
+  }
+};
 
 export const authService = {
-  /**
-   * Admin login — checks credentials against backend and ensures only ADMIN can access
-   */
   async signIn(username, password) {
     try {
-      const response = await axios.post(`${BASE_URL}/auth/login`, {
+      const response = await axios.post(\`\${BASE_URL}/auth/login\`, {
         email: username,
         password
       });
+      const tokens = response.data?.tokens;
+      if (!tokens?.AccessToken) throw new Error('Authentication response did not include an access token.');
 
-      const tokens = response.data.tokens;
+      // Claims here are only for display/navigation. Backend authorization independently
+      // validates signature, issuer, token_use, client_id and group membership.
+      const claims = decodeClaimsForDisplayOnly(tokens.AccessToken);
+      const groups = Array.isArray(claims['cognito:groups']) ? claims['cognito:groups'] : [];
+      const normalizedGroups = new Set(groups.map(group => String(group).toUpperCase()));
+      const role = normalizedGroups.has('ADMIN') || normalizedGroups.has('ADMINISTRATORS')
+        ? 'ADMIN'
+        : normalizedGroups.has('SECURITY_PERSONNEL') || normalizedGroups.has('SECURITYSTAFF') || normalizedGroups.has('SUPERVISORS')
+          ? 'SECURITY_PERSONNEL'
+          : 'REGULAR_USER';
 
-      // ✅ Ensure user is an ADMIN
-      if (tokens.role !== 'ADMIN') {
-        throw new Error('Access denied: Only admin users can access this application');
+      if (role !== 'ADMIN') {
+        accessToken = null;
+        currentUser = null;
+        throw new Error('Access denied: an administrator account is required.');
       }
 
-      // ✅ Save token and user to localStorage
-      const accessToken = tokens.AccessToken;
-      localStorage.setItem('authToken', accessToken); // Store only AccessToken
-      localStorage.setItem('authUser', JSON.stringify({ // Store minimal user data
-        email: username,
-        role: tokens.role
-      }));
-
-      // ✅ Return mock Cognito-style session
-      return {
-        ...tokens,
-        signInUserSession: {
-          accessToken: {
-            payload: {
-              'cognito:groups': ['Administrators'],
-              'email': username
-            }
-          }
-        }
-      };
+      accessToken = tokens.AccessToken;
+      currentUser = { email: claims.email || username, role, groups };
+      return currentUser;
     } catch (error) {
-      console.error('Login error:', {
-        message: error?.response?.data?.message || error.message,
-        status: error?.response?.status,
-        stack: error.stack
-      });
-      throw new Error(error?.response?.data?.message || 'Invalid credentials');
+      accessToken = null;
+      currentUser = null;
+      throw new Error(error?.response?.status === 401
+        ? 'Invalid credentials.'
+        : (error.message || 'Login failed.'));
     }
   },
 
-  /**
-   * Sign out admin user
-   */
   async signOut() {
-    localStorage.removeItem('authUser');
-    localStorage.removeItem('authToken');
-    return Promise.resolve();
+    accessToken = null;
+    currentUser = null;
   },
 
-  /**
-   * Get currently authenticated user from localStorage
-   */
   async getCurrentAuthenticatedUser() {
-    const user = localStorage.getItem('authUser');
-    if (user) return JSON.parse(user);
-    throw new Error('No authenticated user');
+    if (!accessToken || !currentUser) throw new Error('Please sign in again.');
+    return currentUser;
   },
 
-  /**
-   * Sign-up is disabled on web
-   */
   async signUp() {
     throw new Error('Registration not allowed on web');
   },
-
-  /**
-   * Placeholder for confirmation code flow (unused on web)
-   */
   async confirmSignUp() {
-    return Promise.resolve();
+    throw new Error('Confirmation is not supported on this dashboard.');
   },
-
-  /**
-   * Placeholder for password recovery flow (unused on web)
-   */
   async forgotPassword() {
-    return Promise.resolve();
+    throw new Error('Use the account recovery flow in the mobile app.');
   },
-
   async confirmForgotPassword() {
-    return Promise.resolve();
+    throw new Error('Use the account recovery flow in the mobile app.');
   },
 
-  /**
-   * Returns true if user is authenticated (has authToken in storage)
-   */
   async isAuthenticated() {
-    const token = localStorage.getItem('authToken');
-    return !!token;
+    if (!accessToken) return false;
+    const claims = decodeClaimsForDisplayOnly(accessToken);
+    return Number.isFinite(claims.exp) && claims.exp * 1000 > Date.now();
   },
 
-  /**
-   * Returns Authorization header with saved token
-   */
   getAuthHeader() {
-    const token = localStorage.getItem('authToken');
-    console.log('getAuthHeader called, token:', token ? 'present' : 'missing');
-    if (token) {
-      console.log('Token length:', token.length);
-      console.log('Token starts with:', token.substring(0, 20) + '...');
-    }
-    return token ? { Authorization: `Bearer ${token}` } : {};
+    return accessToken ? { Authorization: \`Bearer \${accessToken}\` } : {};
+  },
+
+  getCurrentUser() {
+    return currentUser;
   }
 };
 
