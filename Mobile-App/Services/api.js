@@ -60,6 +60,11 @@ export const setTokens = async ({ accessToken, refreshToken }) => {
   if (refreshToken) await writeToken('refreshToken', refreshToken);
 };
 
+export const getTokens = async () => ({
+  accessToken: await readToken('accessToken'),
+  refreshToken: await readToken('refreshToken')
+});
+
 export const clearTokens = async () => {
   await Promise.all(['accessToken', 'refreshToken', 'idToken'].map(deleteToken));
 };
