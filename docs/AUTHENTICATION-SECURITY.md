@@ -11,7 +11,7 @@
 
 ## Required deployment configuration
 
-Set these values in the deployment environment or a local, untracked `.env` file. Do not commit credentials or local environment files.
+Set these values in the deployment environment. For Serverless Framework variable resolution, export the required values in the shell or configure your CI/CD secrets before running deployment; the backend's runtime `dotenv` loading does not necessarily make `.env` values available while Serverless parses `serverless.yml`. Keep local `.env` files untracked.
 
 - `COGNITO_USER_POOL_ID`: the User Pool that actually contains the app's users.
 - `COGNITO_USER_POOL_CLIENT_ID`: the public app client used by the mobile app and dashboard.
