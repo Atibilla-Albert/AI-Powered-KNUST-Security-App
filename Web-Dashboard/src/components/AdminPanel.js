@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import '../styles/AdminPanel.css';
+import { incidentService } from '../services/incident';
 
 const IncidentAdminPanel = ({ 
   incident, 
@@ -17,35 +18,24 @@ const IncidentAdminPanel = ({
   const [responseText, setResponseText] = useState('');
   const [newDepartment, setNewDepartment] = useState('');
   const [newStatus, setNewStatus] = useState('');
+  const [departmentOptions, setDepartmentOptions] = useState([]);
 
-  // Comprehensive list of school departments
-  const departments = [
-    'Security',
-    'Woodwork',
-    'Electrical',
-    'Roadworthy',
-    'Mechanical',
-    'Building & Construction',
-    'Information Technology',
-    'Administration',
-    'Student Affairs',
-    'Facilities Management',
-    'Health Services',
-    'Transportation',
-    'Catering',
-    'Library',
-    'Sports & Recreation',
-    'Academic Affairs',
-    'Research & Development',
-    'International Relations',
-    'Finance & Accounting',
-    'Human Resources',
-    'Legal Services',
-    'Public Relations',
-    'Environmental Services',
-    'Emergency Response',
-    'Quality Assurance'
-  ];
+  // Load departments from backend so we use valid IDs (keys expected by API)
+  useEffect(() => {
+    let isMounted = true;
+    const loadDepartments = async () => {
+      try {
+        const data = await incidentService.getDepartments();
+        // Expecting { departments: [{ id, name, ... }] }
+        const options = (data?.departments || []).map(d => ({ id: d.id, name: d.name || d.id }));
+        if (isMounted) setDepartmentOptions(options);
+      } catch (err) {
+        console.error('Failed to load departments:', err);
+      }
+    };
+    loadDepartments();
+    return () => { isMounted = false; };
+  }, []);
 
   const handleAddResponse = async () => {
     if (!incident || !responseText.trim()) return;
@@ -62,10 +52,18 @@ const IncidentAdminPanel = ({
 
   const handleAssignToDepartment = async () => {
     if (!incident || !newDepartment.trim()) return;
+    const deptId = newDepartment.trim();
+    const deptName = departmentOptions.find(d => d.id === deptId)?.name || deptId;
     try {
-      const updated = await assignIncident(incident.incidentId, newDepartment.trim(), `Assigned to ${newDepartment} department`);
+      // newDepartment is the department ID (e.g., SECURITY) as required by backend
+      const response = await assignIncident(
+        incident.incidentId,
+        deptId,
+        `Assigned to ${deptName} department`
+      );
       setNewDepartment('');
-      sendNotification(`Incident assigned to ${newDepartment} department`, 'success');
+      sendNotification(`Incident assigned to ${deptName} department`, 'success');
+      // Refresh incident to show updated assignment
       refreshIncident();
     } catch (err) {
       console.error('Failed to assign incident:', err);
@@ -110,8 +108,10 @@ const IncidentAdminPanel = ({
           className="department-select"
         >
           <option value="">Select Department</option>
-          {departments.map(dept => (
-            <option key={dept} value={dept}>{dept}</option>
+          {departmentOptions.map(opt => (
+            <option key={opt.id} value={opt.id}>
+              {opt.name}
+            </option>
           ))}
         </select>
         <button 
@@ -148,7 +148,9 @@ const IncidentAdminPanel = ({
       <div className="admin-section">
         <h4>Current Assignment</h4>
         <div className="current-assignment">
-          <p><strong>Department:</strong> {incident.assignedTo || 'Unassigned'}</p>
+          <p><strong>Department:</strong> {
+            (departmentOptions.find(d => d.id === incident.assignedTo)?.name) || incident.assignedTo || 'Unassigned'
+          }</p>
           <p><strong>Status:</strong> {incident.status}</p>
           <p><strong>Severity:</strong> {incident.severityLevel}</p>
         </div>
