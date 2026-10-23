@@ -83,7 +83,7 @@ const reportIncident = async (event) => {
     if (!location) {
       const ip = event.requestContext?.identity?.sourceIp;
       if (ip) {
-        const geo = await fetch(`http://ip-api.com/json/${ip}`).then(res => res.json());
+        const geo = await fetch(`https://ip-api.com/json/${encodeURIComponent(ip)}`).then(res => res.json());
         if (geo.status === 'success') {
           location = {
             latitude: geo.lat,
@@ -115,7 +115,7 @@ const reportIncident = async (event) => {
     console.info('Creating incident', { requestId: event.requestContext?.requestId || 'local-dev' });
     const savedIncident = await incidentRepo.createIncident(incident);
 
-    console.log('Invoking fraud assessment Lambda for incident:', savedIncident.incidentId);
+    console.info('Invoking fraud assessment Lambda');
     await lambda.send(new InvokeCommand({
       FunctionName: 'security-system-fraud-assessment',
       InvocationType: 'Event',
@@ -124,7 +124,7 @@ const reportIncident = async (event) => {
         reporter: { id: reporterId, name: reporterName },
       }),
     })).catch(err => {
-      console.error('Error invoking fraud assessment:', err);
+      console.error('Fraud assessment invocation failed', { name: err.name || 'Error' });
     });
 
     return generateApiResponse(201, { incidentId: savedIncident.incidentId, ...savedIncident.toPublicJSON() });
@@ -310,7 +310,7 @@ const listIncidents = async (event) => {
         queryParams.FilterExpression = conditions.join(' AND ');
       }
 
-      console.log('Query params:', JSON.stringify(queryParams, null, 2));
+      // Query parameters may contain user identifiers; do not log their values.
       items = await incidentRepo.getIncidentsByStatus(status.toUpperCase(), limit, null);
       items = items.items;
     } else {
@@ -360,7 +360,7 @@ const listIncidents = async (event) => {
         scanParams.FilterExpression = conditions.join(' AND ');
       }
 
-      console.log('Scan params:', JSON.stringify(scanParams, null, 2));
+      // Do not log query values or incident records.
       items = await scanTable(scanParams);
     }
 
