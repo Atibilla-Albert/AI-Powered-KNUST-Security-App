@@ -5,7 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
 import Toast from 'react-native-toast-message';
 import { sendEmergencyAlert } from '../Services/api'; // adjust path if needed
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { getTokens } from '../Services/api';
 
 export default function FloatingSOSButton() {
   const [loading, setLoading] = useState(false);
@@ -60,7 +60,7 @@ export default function FloatingSOSButton() {
 
       const result = { location: locationData, address: formattedAddress };
       lastLocationRef.current = result; // cache it
-      console.log('Location fetched:', result);
+
       return result;
     } catch (err) {
       console.error('Location fetch failed:', err.message);
@@ -75,7 +75,7 @@ export default function FloatingSOSButton() {
       // Use cached location if present, otherwise fetch new
       let current = lastLocationRef.current;
       if (!current) {
-        console.log('No cached location; fetching now...');
+
         current = await requestLocation();
         if (!current) {
           Toast.show({
@@ -92,7 +92,7 @@ export default function FloatingSOSButton() {
       const address = current.address || 'Unknown location';
 
       // Get auth token
-      const token = await AsyncStorage.getItem('accessToken');
+      const { accessToken: token } = await getTokens();
       if (!token) {
         Alert.alert(
           'Authentication Error',
@@ -110,7 +110,7 @@ export default function FloatingSOSButton() {
         accuracy: typeof accuracy === 'number' ? accuracy : null,
       };
 
-      console.log('Sending emergency alert with data:', payload);
+
       const response = await sendEmergencyAlert(payload); // token auto-injected by interceptor
 
       Toast.show({
@@ -121,9 +121,9 @@ export default function FloatingSOSButton() {
         visibilityTime: 4000,
       });
 
-      console.log('Emergency alert response:', response.data);
+
     } catch (err) {
-      console.error('SOS Error:', err);
+      console.error('SOS request failed', { status: err.response?.status, code: err.code });
       let errorMessage = 'Please try again or contact security directly';
 
       const status = err.response?.status;
