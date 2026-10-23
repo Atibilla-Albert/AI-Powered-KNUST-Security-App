@@ -20,8 +20,8 @@ const lambdaClient = new LambdaClient({ region: AWS_REGION });
 
 // Table names
 const TABLES = {
-  INCIDENTS: `${STAGE}-incidents`,
-  USERS: `${STAGE}-users`,
+  INCIDENTS: getEnvironmentVariable('INCIDENTS_TABLE_NAME', `${STAGE}-incidents`),
+  USERS: getEnvironmentVariable('USERS_TABLE_NAME', `${STAGE}-users`),
   ORGANIZATIONS: `${STAGE}-organizations`,
   NOTIFICATIONS: `${STAGE}-notifications`
 };
