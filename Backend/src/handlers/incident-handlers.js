@@ -17,6 +17,7 @@ const { getUserDetails } = require('../auth/cognito');
 const fetch = require('node-fetch');
 const { User } = require('../data/models/users');
 const { formatDepartmentAssignmentNotification } = require('../notification/templates');
+const sesService = require('../notification/sesService');
 
 const s3 = new S3Client({ region: process.env.AWS_REGION || 'us-east-1' });
 const lambda = new LambdaClient({ region: process.env.AWS_REGION || 'us-east-1' });
@@ -590,35 +591,71 @@ const assignIncidentToDepartment = async (event) => {
       updatedAt: new Date().toISOString()
     };
 
-    const updatedIncident = await incidentRepo.updateIncident(incident.updateFromObject(updates));
+    // Apply updates to the existing incident instance, then persist
+    incident.updateFromObject(updates);
+    const updatedIncident = await incidentRepo.updateIncident(incident);
 
-    // Send notification to department
-    try {
-      const notificationMessage = formatDepartmentAssignmentNotification(
-        updatedIncident.toPublicJSON(),
-        department,
-        assignedByName
-      );
+    // Send notification to department email
+    if (department.email) {
+      try {
+        // Format notification message with incident details and map routes
+        const notificationMessage = formatDepartmentAssignmentNotification(
+          updatedIncident.toPublicJSON(),
+          department,
+          assignedByName
+        );
 
-      const subject = `Incident Assignment: ${incident.incidentId} - ${department.name}`;
-      
-      // Send email notification to department
-      await snsService.sendNotification(
-        process.env.SNS_TOPIC_ARN || 'arn:aws:sns:us-east-1:717279717548:security-incident-reporting-dev-incident-alerts',
-        subject,
-        notificationMessage,
-        {
-          incidentId: incident.incidentId,
-          departmentId: departmentId.toUpperCase(),
-          severityLevel: incident.severityLevel,
-          assignmentType: 'department'
+        const subject = `🚨 Incident Assignment: ${incident.incidentId} - ${department.name}`;
+        
+        // Automatically subscribe department email to SNS topic for future notifications (non-blocking)
+        const topicArn = process.env.SNS_TOPIC_ARN || 'arn:aws:sns:us-east-1:717279717548:security-incident-reporting-dev-incident-alerts';
+        try {
+          await snsService.subscribeEmail(topicArn, department.email);
+          console.log(`✅ Department email ${department.email} automatically subscribed to SNS topic for ${department.name}`);
+        } catch (subscribeError) {
+          // Already subscribed or pending confirmation - that's fine, log for info
+          console.debug(`Subscription status for ${department.email}: ${subscribeError.message}`);
         }
-      );
 
-      console.log(`Department assignment notification sent to ${department.name} for incident ${incidentId}`);
-    } catch (notificationError) {
-      console.error('Failed to send department assignment notification:', notificationError);
-      // Don't fail the assignment if notification fails
+        // Method 1: Send email directly via SES (immediate, no subscription confirmation needed)
+        try {
+          await sesService.sendEmail(
+            department.email,
+            subject,
+            notificationMessage
+          );
+          console.log(`✅ Direct email sent to ${department.email} (${department.name}) for incident ${incidentId}`);
+        } catch (sesError) {
+          console.warn(`SES email failed, falling back to SNS:`, sesError.message);
+          
+          // Method 2: Fallback to SNS topic (if email is already confirmed/subscribed)
+          try {
+            await snsService.sendNotification(
+              topicArn,
+              subject,
+              notificationMessage,
+              {
+                incidentId: incident.incidentId,
+                departmentId: departmentId.toUpperCase(),
+                severityLevel: incident.severityLevel,
+                assignmentType: 'department',
+                recipientEmail: department.email
+              }
+            );
+            console.log(`📬 SNS notification sent to ${department.email} (${department.name}) for incident ${incidentId}`);
+          } catch (snsError) {
+            console.warn(`SNS notification also failed:`, snsError.message);
+            // Email might need confirmation for first-time SNS subscription
+            console.log(`ℹ️  Note: If this is the first assignment, ${department.email} may need to confirm SNS subscription`);
+          }
+        }
+
+      } catch (notificationError) {
+        console.error('Failed to send department assignment notification:', notificationError);
+        // Don't fail the assignment if notification fails - assignment is still successful
+      }
+    } else {
+      console.warn(`No email address configured for department ${department.name}`);
     }
 
     return generateApiResponse(200, {
