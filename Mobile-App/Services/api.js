@@ -73,8 +73,10 @@ const processQueue = (error, token = null) => {
 // ------------------ Request Interceptor ------------------
 api.interceptors.request.use(
   async (config) => {
-    const token = await SecureStore.getItemAsync('accessToken');
+    const isPublicAuthRoute = config.url?.startsWith('/auth/');
+    const token = isPublicAuthRoute ? null : await SecureStore.getItemAsync('accessToken');
     if (token) {
+      config.headers = config.headers || {};
       config.headers.Authorization = `Bearer ${token}`;
       if (__DEV__) {
         console.log('Added Authorization header', {
@@ -110,7 +112,8 @@ api.interceptors.response.use(
     const status = error.response?.status;
 
     // Handle 401 token refresh
-    if (status === 401 && !originalRequest._retry) {
+    const isPublicAuthRoute = originalRequest.url?.startsWith('/auth/');
+    if (status === 401 && !originalRequest._retry && !isPublicAuthRoute) {
       if (isRefreshing) {
         // Queue and wait for refresh to complete
         return new Promise((resolve, reject) => {
