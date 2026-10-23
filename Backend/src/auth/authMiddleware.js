@@ -177,7 +177,7 @@ const lambdaAuthorize = (allowedRoles = [], allowedGroups = []) => async (event,
 
   const roleAllowed = allowedRoles.length === 0 || allowedRoles.includes(user.role);
   const groupAllowed = allowedGroups.length === 0 || user.groups.some(group => allowedGroups.includes(group));
-  if (!roleAllowed && !groupAllowed) {
+  if (!roleAllowed || !groupAllowed) {
     return forbiddenResponse("Insufficient permissions", "INSUFFICIENT_PERMISSIONS", requestId);
   }
   return { isAuthorized: true, statusCode: 200, context: { user } };
