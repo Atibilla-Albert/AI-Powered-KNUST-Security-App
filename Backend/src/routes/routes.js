@@ -10,34 +10,32 @@ const { USER_ROLES } = require('../config/config');
 const { Logger } = require('@aws-lambda-powertools/logger');
 
 const logger = new Logger({ serviceName: 'security-incident-reporting' });
-const isDev = (process.env.STAGE || 'dev') === 'dev';
 
 // Logging middleware for request and response
 const loggingMiddleware = (handler) => async (event, context) => {
-  logger.info('Incoming request', {
+  const requestId = context?.awsRequestId || "local-dev";
+  logger.info("Request received", {
+    requestId,
     path: event.path,
-    method: event.httpMethod,
-    headers: event.headers,
-    body: event.body ? JSON.parse(event.body) : null,
-    queryStringParameters: event.queryStringParameters,
+    method: event.httpMethod
   });
 
   try {
     const response = await handler(event, context);
-    logger.info('Request completed', {
+    logger.info("Request completed", {
+      requestId,
       path: event.path,
       method: event.httpMethod,
-      statusCode: response.statusCode,
-      response: response.body ? JSON.parse(response.body) : null,
+      statusCode: response.statusCode
     });
     return response;
   } catch (error) {
-    logger.error('Request failed', {
+    logger.error("Request failed", {
+      requestId,
       path: event.path,
       method: event.httpMethod,
-      error: error.message,
-      stack: error.stack,
       statusCode: error.statusCode || 500,
+      errorName: error.name || "Error"
     });
     throw error;
   }
@@ -77,7 +75,7 @@ const defineRoutes = () => ({
   '/incidents/:id/assign': {
     post: { 
       handler: loggingMiddleware(incidentHandlers.assignIncidentToDepartment), 
-      middleware: isDev ? [] : [lambdaAuthenticate, lambdaAuthorize([USER_ROLES.SECURITY_PERSONNEL, USER_ROLES.ADMIN])] 
+      middleware: [lambdaAuthenticate, lambdaAuthorize([USER_ROLES.SECURITY_PERSONNEL, USER_ROLES.ADMIN])] 
     },
   },
   '/incidents/my': {
@@ -89,7 +87,7 @@ const defineRoutes = () => ({
   '/departments': {
     get: { 
       handler: loggingMiddleware(incidentHandlers.getDepartments), 
-      middleware: isDev ? [] : [lambdaAuthenticate] 
+      middleware: [lambdaAuthenticate] 
     },
   },
 
