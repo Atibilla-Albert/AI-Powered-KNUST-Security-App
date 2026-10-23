@@ -3,6 +3,7 @@ import { useParams, Link } from 'react-router-dom';
 import { useIncidents } from '../contexts/IncidentContext';
 import { useAuth } from '../contexts/AuthContext';
 import { userService } from '../services/users';
+import { incidentService } from '../services/incident';
 import { formatDate } from '../utils/helpers';
 import LocationName from '../components/LocationName';
 import '../styles/IncidentDetails.css';
@@ -39,6 +40,7 @@ const IncidentDetail = () => {
   const [selectedMedia, setSelectedMedia] = useState(null);
   const [error, setError] = useState(null);
   const [mapLoading, setMapLoading] = useState(false);
+  const [departmentOptions, setDepartmentOptions] = useState([]);
 
   const mapContainerRef = useRef(null);
   const mapInstanceRef = useRef(null);
@@ -183,6 +185,22 @@ const IncidentDetail = () => {
   
   
   
+  // Load departments for display
+  useEffect(() => {
+    let isMounted = true;
+    const loadDepartments = async () => {
+      try {
+        const data = await incidentService.getDepartments();
+        const options = (data?.departments || []).map(d => ({ id: d.id, name: d.name || d.id }));
+        if (isMounted) setDepartmentOptions(options);
+      } catch (err) {
+        console.error('Failed to load departments:', err);
+      }
+    };
+    loadDepartments();
+    return () => { isMounted = false; };
+  }, []);
+
   useEffect(() => {
     fetchIncident();
     refreshIntervalRef.current = setInterval(() => silentRefresh(), 30000);
@@ -219,7 +237,11 @@ const IncidentDetail = () => {
             <p><strong>Location:</strong> <LocationName incident={incident} /></p>
             <p><strong>Status:</strong> {incident.status}</p>
             <p><strong>Severity:</strong> {incident.severityLevel}</p>
-            <p><strong>Department:</strong> {incident.assignedTo || 'Unassigned'}</p>
+            <p><strong>Department:</strong> {
+              incident.assignedTo 
+                ? (departmentOptions.find(d => d.id === incident.assignedTo)?.name || incident.assignedTo)
+                : 'Unassigned'
+            }</p>
             <p><strong>Description:</strong> {incident.description}</p>
             <p><strong>Created At:</strong> {formatDate(incident.createdAt)}</p>
           </div>
