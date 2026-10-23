@@ -163,7 +163,9 @@ async function authenticate(email, password) {
     const user = await getUserDetails(response.AuthenticationResult.AccessToken);
     const role = user.sub ? await getUserRoleById(user.sub) : null;
     if (!role) {
-      throw new Error("User profile is not provisioned");
+      const profileError = new Error("User profile is not provisioned");
+      profileError.statusCode = 403;
+      throw profileError;
     }
     return {
       ...response.AuthenticationResult,
