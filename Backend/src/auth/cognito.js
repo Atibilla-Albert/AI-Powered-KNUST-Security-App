@@ -12,7 +12,7 @@ const {
 
 const config = require("../config/config");
 const awsConfig = require("../config/aws-config");
-const userRepo = require("../data/repositories/userRepo");
+const { getUserRoleById } = require("./userRole");
 const { errorResponse } = require("../utils/api-response");
 const { User } = require('../data/models/users');
 const { createItem } = require('../data/dynamodbclient');
@@ -161,10 +161,13 @@ async function authenticate(email, password) {
   try {
     const response = await cognitoClient.send(command);
     const user = await getUserDetails(response.AuthenticationResult.AccessToken);
-    const appUser = user.sub ? await userRepo.getUserById(user.sub) : null;
+    const role = user.sub ? await getUserRoleById(user.sub) : null;
+    if (!role) {
+      throw new Error("User profile is not provisioned");
+    }
     return {
       ...response.AuthenticationResult,
-      role: appUser && appUser.role ? appUser.role : 'REGULAR_USER'
+      role
     };
   } catch (error) {
     throw handleCognitoError(error, 'authentication');
