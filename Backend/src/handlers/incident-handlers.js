@@ -105,7 +105,7 @@ const reportIncident = async (event) => {
       createdAt: new Date().toISOString(),
     });
 
-    console.log('Creating incident:', JSON.stringify(incident.toDynamoItem(), null, 2));
+    console.info('Creating incident', { requestId: event.requestContext?.requestId || 'local-dev' });
     const savedIncident = await incidentRepo.createIncident(incident);
 
     console.log('Invoking fraud assessment Lambda for incident:', savedIncident.incidentId);
@@ -122,7 +122,7 @@ const reportIncident = async (event) => {
 
     return generateApiResponse(201, { incidentId: savedIncident.incidentId, ...savedIncident.toPublicJSON() });
   } catch (error) {
-    console.error('Error reporting incident:', error);
+    console.error('Error reporting incident', { name: error.name || 'Error' });
     return generateApiResponse(400, { error: error.message });
   }
 };
@@ -131,7 +131,7 @@ const reportIncident = async (event) => {
  * Process new incident and trigger fraud assessment (used by POST /incidents/process)
  */
 const processNewIncident = async (event, context) => {
-  console.log('Processing new incident report:', JSON.stringify(event, null, 2));
+  console.info('Processing incident request', { requestId: event.requestContext?.requestId || 'local-dev' });
 
   try {
     const data = typeof event.body === 'string' ? JSON.parse(event.body) : event.body;
@@ -185,7 +185,7 @@ const processNewIncident = async (event, context) => {
 
     return generateApiResponse(201, { incidentId: savedIncident.incidentId, ...Incident.fromDynamoItem(savedIncident).toPublicJSON() });
   } catch (error) {
-    console.error('Error processing incident:', error);
+    console.error('Error processing incident', { name: error.name || 'Error' });
     return generateApiResponse(400, { error: error.message });
   }
 };
