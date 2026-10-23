@@ -49,22 +49,26 @@ async function getUserDetails(accessToken) {
 
 // Error handler
 const handleCognitoError = (error, operation) => {
-  console.warn(`Cognito ${operation} failed`, { code: error.name || error.code || 'UnknownError' });
+  const name = error.name || error.code || 'UnknownError';
+  console.warn(`Cognito ${operation} failed`, { code: name });
 
-  if (error.name === 'UsernameExistsException') {
-    return errorResponse('User already exists', 409);
-  }
-  if (error.name === 'NotAuthorizedException') {
-    return errorResponse('Invalid credentials', 401);
-  }
-  if (error.name === 'UserNotFoundException') {
-    return errorResponse('Invalid email or password', 401);
-  }
-  if (error.name === 'CodeMismatchException') {
-    return errorResponse('Invalid verification code', 400);
-  }
+  const publicError = (message, statusCode = 400) => {
+    const result = new Error(message);
+    result.statusCode = statusCode;
+    return result;
+  };
 
-  return errorResponse(`Unable to complete ${operation}. Please check the supplied details and try again.`, 400);
+  if (name === 'UsernameExistsException') return publicError('An account with these details already exists.', 409);
+  if (name === 'NotAuthorizedException' || name === 'UserNotFoundException') {
+    return publicError('Invalid email or password.', 401);
+  }
+  if (name === 'CodeMismatchException' || name === 'ExpiredCodeException') {
+    return publicError('The verification code is invalid or expired.', 400);
+  }
+  if (name === 'UserNotConfirmedException') {
+    return publicError('Account confirmation is required before signing in.', 403);
+  }
+  return publicError(`Unable to complete ${operation}. Please try again.`, 400);
 };
 
 // Register user with required custom attributes
@@ -216,7 +220,7 @@ async function forgotPasswordHandler(event) {
       body: JSON.stringify({ message: "Password reset code sent to email" })
     };
   } catch (error) {
-    return errorResponse(error.message || "Failed to send password reset code", 400);
+    return errorResponse("Unable to process the password reset request. If the account is eligible, instructions will be sent.", 400);
   }
 }
 
@@ -238,7 +242,7 @@ async function confirmForgotPasswordHandler(event) {
       body: JSON.stringify({ message: "Password has been reset successfully" })
     };
   } catch (error) {
-    return errorResponse(error.message || "Failed to reset password", 400);
+    return errorResponse("Unable to reset the password. Check the code and try again.", 400);
   }
 }
 
@@ -261,7 +265,7 @@ async function resendConfirmationCodeHandler(event) {
       body: JSON.stringify({ message: "Confirmation code resent successfully" })
     };
   } catch (error) {
-    return errorResponse(error.message || "Failed to resend confirmation code", 400);
+    return errorResponse("Unable to resend the confirmation code. Check the email and try again.", 400);
   }
 }
 
@@ -300,7 +304,7 @@ async function registerUserHandler(event) {
       })
     };
   } catch (error) {
-    return errorResponse(error.message, 400);
+    return errorResponse(error.message || "Unable to complete the request.", error.statusCode || 400);
   }
 }
 
@@ -315,7 +319,7 @@ async function confirmRegistrationHandler(event) {
       body: JSON.stringify({ message: "User confirmed successfully" })
     };
   } catch (error) {
-    return errorResponse(error.message, 400);
+    return errorResponse(error.message || "Unable to complete the request.", error.statusCode || 400);
   }
 }
 
