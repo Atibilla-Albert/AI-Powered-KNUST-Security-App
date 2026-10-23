@@ -139,7 +139,7 @@ api.interceptors.response.use(
     const status = error.response?.status;
 
     // Handle 401 token refresh
-    if (status === 401 && !originalRequest._retry) {
+    if (status === 401 && !originalRequest._retry && !String(originalRequest.url || '').startsWith('/auth/')) {
       if (isRefreshing) {
         // Queue and wait for refresh to complete
         return new Promise((resolve, reject) => {
@@ -350,7 +350,7 @@ export const uploadToS3 = async (presignedUrl, fileUri, contentType) => {
     if (__DEV__) {
       console.error('S3 upload failed', { status: uploadRes.status });
     }
-    throw new Error(`Failed to upload media to S3: ${uploadRes.status} ${text}`);
+    throw new Error(`Failed to upload media to S3 (HTTP ${uploadRes.status}).`);
   }
 
   if (__DEV__) console.log('S3 upload successful');
@@ -370,7 +370,6 @@ export const addIncidentAttachment = (incidentId, key) => {
       if (__DEV__) {
         console.error('Failed to add attachment:', {
           status: error.response?.status,
-          data: error.response?.data,
           message: error.message,
         });
       }
@@ -384,7 +383,7 @@ export const sendEmergencyAlert = async (
   opts = {}
 ) => {
   if (typeof latitude !== 'number' || typeof longitude !== 'number') {
-    if (__DEV__) console.error('Invalid emergency alert data', { latitude, longitude });
+    if (__DEV__) console.error('Invalid emergency alert coordinates');
     throw new Error('Latitude and longitude must be numbers');
   }
 
@@ -419,7 +418,6 @@ export const sendEmergencyAlert = async (
     if (__DEV__) {
       console.error('Emergency alert failed:', {
         status: error.response?.status,
-        data: error.response?.data,
         message: error.message,
         url: error.config?.url,
         method: error.config?.method,
