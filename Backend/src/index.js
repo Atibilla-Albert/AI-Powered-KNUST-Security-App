@@ -4,9 +4,7 @@ require('dotenv').config();
 const { defineRoutes } = require('./routes/routes');
 const routes = defineRoutes();
 
-console.log('=== ENVIRONMENT VARIABLES ===');
-console.log('COGNITO_USER_POOL_CLIENT_ID:', process.env.COGNITO_USER_POOL_CLIENT_ID);
-console.log('AWS_REGION:', process.env.AWS_REGION);
+// Do not log environment variables or identity-provider configuration at startup.
 
 exports.api = async (event, context) => {
   const method = event.httpMethod ? event.httpMethod.toLowerCase() : 'get';
