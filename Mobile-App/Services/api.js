@@ -293,8 +293,9 @@ export const reportIncident = (incidentData) => {
 };
 
 export const getIncidents = () => {
-  if (__DEV__) console.log('Fetching all incidents');
-  return api.get('/incidents');
+  // Mobile users see their own reports; staff use the dedicated security endpoint.
+  if (__DEV__) console.log('Fetching current user incidents');
+  return api.get('/incidents/my');
 };
 
 export const getMyIncidents = () => {
