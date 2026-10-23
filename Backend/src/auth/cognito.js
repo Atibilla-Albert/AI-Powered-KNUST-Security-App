@@ -11,6 +11,8 @@ const {
 } = require("@aws-sdk/client-cognito-identity-provider");
 
 const config = require("../config/config");
+const awsConfig = require("../config/aws-config");
+const userRepo = require("../data/repositories/userRepo");
 const { errorResponse } = require("../utils/api-response");
 const { User } = require('../data/models/users');
 const { createItem } = require('../data/dynamodbclient');
@@ -33,7 +35,7 @@ function validateCognitoConfig() {
 }
 
 const cognitoClient = new CognitoIdentityProviderClient({
-  region: config.awsRegion
+  region: awsConfig.AWS_REGION
 });
 
 // Get user details from Cognito
@@ -49,26 +51,23 @@ async function getUserDetails(accessToken) {
 
 // Error handler
 const handleCognitoError = (error, operation) => {
-  console.error(`Cognito ${operation} error:`, {
-    message: error.message,
-    code: error.code,
-    stack: error.stack
-  });
-
-  if (error.name === 'UsernameExistsException') {
-    return errorResponse('User already exists', 409);
-  }
-  if (error.name === 'NotAuthorizedException') {
-    return errorResponse('Invalid credentials', 401);
-  }
-  if (error.name === 'UserNotFoundException') {
-    return errorResponse('User not found', 404);
-  }
-  if (error.name === 'CodeMismatchException') {
-    return errorResponse('Invalid verification code', 400);
-  }
-
-  return errorResponse(error.message || `Cognito ${operation} failed`, 400);
+  const mapping = {
+    UsernameExistsException: [409, "An account with these details already exists"],
+    NotAuthorizedException: [401, "Invalid credentials or expired session"],
+    UserNotFoundException: [400, "Unable to complete authentication request"],
+    UserNotConfirmedException: [403, "Account confirmation is required"],
+    CodeMismatchException: [400, "Invalid verification code"],
+    ExpiredCodeException: [400, "Verification code has expired"],
+    TooManyRequestsException: [429, "Too many requests. Try again later"],
+    LimitExceededException: [429, "Too many requests. Try again later"],
+    InvalidPasswordException: [400, "Password does not meet the security requirements"],
+  };
+  const [statusCode, message] = mapping[error.name] || [500, "Authentication service request failed"];
+  console.warn("Cognito operation failed", { operation, code: error.name || "UnknownError" });
+  const safeError = new Error(message);
+  safeError.statusCode = statusCode;
+  safeError.code = error.name || "COGNITO_ERROR";
+  return safeError;
 };
 
 // Register user with required custom attributes
@@ -79,7 +78,8 @@ async function registerUser(email, password, attributes = {}) {
     throw new Error("Email and password are required");
   }
 
-  const { ['custom:firstName']: firstName, ['custom:lastName']: lastName } = attributes;
+  const firstName = attributes['custom:firstName'] || attributes.firstName;
+  const lastName = attributes['custom:lastName'] || attributes.lastName;
 
   if (!firstName || !lastName) {
     throw new Error("First name and last name are required");
@@ -98,10 +98,6 @@ async function registerUser(email, password, attributes = {}) {
       Name: 'custom:lastName',
       Value: lastName
     },
-    {
-      Name: 'custom:role',
-      Value: attributes['custom:role'] || 'REGULAR_USER'
-    }
   ];
 
   const command = new SignUpCommand({
@@ -165,12 +161,10 @@ async function authenticate(email, password) {
   try {
     const response = await cognitoClient.send(command);
     const user = await getUserDetails(response.AuthenticationResult.AccessToken);
-    // if (user['custom:role'] !== 'ADMIN') {
-    //   throw new Error('Unauthorized access');
-    // }
+    const appUser = user.sub ? await userRepo.getUserById(user.sub) : null;
     return {
       ...response.AuthenticationResult,
-      role: user['custom:role']
+      role: appUser && appUser.role ? appUser.role : 'REGULAR_USER'
     };
   } catch (error) {
     throw handleCognitoError(error, 'authentication');
@@ -277,7 +271,8 @@ async function registerUserHandler(event) {
     // Auto-extract full name fields
     const firstName = attributes['custom:firstName'] || attributes.firstName || '';
     const lastName = attributes['custom:lastName'] || attributes.lastName || '';
-    const role = attributes['custom:role'] || attributes.role || 'REGULAR_USER';
+    // Public registration must never assign elevated privileges.
+    const role = 'REGULAR_USER';
 
     if (result && result.userId) {
       const user = new User({
@@ -300,7 +295,7 @@ async function registerUserHandler(event) {
       })
     };
   } catch (error) {
-    return errorResponse(error.message, 400);
+    return errorResponse(error.message || "Registration failed", error.statusCode || 400);
   }
 }
 
@@ -332,7 +327,7 @@ async function authenticateHandler(event) {
       })
     };
   } catch (error) {
-    return errorResponse(error.message, 400);
+    return errorResponse(error.message || "Authentication failed", error.statusCode || 400);
   }
 }
 
@@ -349,7 +344,7 @@ async function refreshTokensHandler(event) {
       })
     };
   } catch (error) {
-    return errorResponse(error.message, 400);
+    return errorResponse(error.message || "Token refresh failed", error.statusCode || 400);
   }
 }
 
