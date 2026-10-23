@@ -1,118 +1,51 @@
 import axios from 'axios';
 
-const BASE_URL = 'http://localhost:3000/dev'; // Update if your backend is deployed elsewhere
+const BASE_URL = (typeof process !== 'undefined' && process.env?.REACT_APP_API_BASE_URL)
+  ? process.env.REACT_APP_API_BASE_URL
+  : 'http://localhost:3000/dev';
+
+// Memory-only storage is safer than localStorage for bearer tokens.
+// Production browser deployments should prefer a BFF with HttpOnly, Secure, SameSite cookies.
+let accessToken = null;
+let authenticatedUser = null;
+
+function decodeJwtPayload(token) {
+  try {
+    const value = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
+    return JSON.parse(atob(value));
+  } catch {
+    return {};
+  }
+}
 
 export const authService = {
-  /**
-   * Admin login — checks credentials against backend and ensures only ADMIN can access
-   */
   async signIn(username, password) {
     try {
-      const response = await axios.post(`${BASE_URL}/auth/login`, {
-        email: username,
-        password
-      });
-
-      const tokens = response.data.tokens;
-
-      // ✅ Ensure user is an ADMIN
-      if (tokens.role !== 'ADMIN') {
-        throw new Error('Access denied: Only admin users can access this application');
-      }
-
-      // ✅ Save token and user to localStorage
-      const accessToken = tokens.AccessToken;
-      localStorage.setItem('authToken', accessToken); // Store only AccessToken
-      localStorage.setItem('authUser', JSON.stringify({ // Store minimal user data
-        email: username,
-        role: tokens.role
-      }));
-
-      // ✅ Return mock Cognito-style session
-      return {
-        ...tokens,
-        signInUserSession: {
-          accessToken: {
-            payload: {
-              'cognito:groups': ['Administrators'],
-              'email': username
-            }
-          }
-        }
-      };
+      const response = await axios.post(`${BASE_URL}/auth/login`, { email: username, password });
+      const tokens = response.data?.tokens;
+      if (!tokens?.AccessToken) throw new Error('Authentication response was incomplete');
+      if (tokens.role !== 'ADMIN') throw new Error('Access denied: administrator access is required');
+      accessToken = tokens.AccessToken;
+      const claims = decodeJwtPayload(accessToken);
+      authenticatedUser = { email: claims.email || username, role: tokens.role };
+      return authenticatedUser;
     } catch (error) {
-      console.error('Login error:', {
-        message: error?.response?.data?.message || error.message,
-        status: error?.response?.status,
-        stack: error.stack
-      });
-      throw new Error(error?.response?.data?.message || 'Invalid credentials');
+      accessToken = null;
+      authenticatedUser = null;
+      throw new Error(error?.response?.status === 401 ? 'Invalid email or password' : error.message || 'Authentication failed');
     }
   },
-
-  /**
-   * Sign out admin user
-   */
-  async signOut() {
-    localStorage.removeItem('authUser');
-    localStorage.removeItem('authToken');
-    return Promise.resolve();
-  },
-
-  /**
-   * Get currently authenticated user from localStorage
-   */
+  async signOut() { accessToken = null; authenticatedUser = null; },
   async getCurrentAuthenticatedUser() {
-    const user = localStorage.getItem('authUser');
-    if (user) return JSON.parse(user);
-    throw new Error('No authenticated user');
+    if (accessToken && authenticatedUser) return authenticatedUser;
+    throw new Error('No authenticated session');
   },
-
-  /**
-   * Sign-up is disabled on web
-   */
-  async signUp() {
-    throw new Error('Registration not allowed on web');
-  },
-
-  /**
-   * Placeholder for confirmation code flow (unused on web)
-   */
-  async confirmSignUp() {
-    return Promise.resolve();
-  },
-
-  /**
-   * Placeholder for password recovery flow (unused on web)
-   */
-  async forgotPassword() {
-    return Promise.resolve();
-  },
-
-  async confirmForgotPassword() {
-    return Promise.resolve();
-  },
-
-  /**
-   * Returns true if user is authenticated (has authToken in storage)
-   */
-  async isAuthenticated() {
-    const token = localStorage.getItem('authToken');
-    return !!token;
-  },
-
-  /**
-   * Returns Authorization header with saved token
-   */
-  getAuthHeader() {
-    const token = localStorage.getItem('authToken');
-    console.log('getAuthHeader called, token:', token ? 'present' : 'missing');
-    if (token) {
-      console.log('Token length:', token.length);
-      console.log('Token starts with:', token.substring(0, 20) + '...');
-    }
-    return token ? { Authorization: `Bearer ${token}` } : {};
-  }
+  async signUp() { throw new Error('Registration not allowed on web'); },
+  async confirmSignUp() { throw new Error('Confirmation flow is not configured on web'); },
+  async forgotPassword() { throw new Error('Password recovery is not configured on web'); },
+  async confirmForgotPassword() { throw new Error('Password recovery is not configured on web'); },
+  async isAuthenticated() { return Boolean(accessToken); },
+  getAuthToken() { return accessToken; },
+  getAuthHeader() { return accessToken ? { Authorization: `Bearer ${accessToken}` } : {}; },
 };
-
 export default authService;
