@@ -33,11 +33,17 @@ const BUCKETS = {
 };
 
 // Cognito
+const USER_POOL_ID = getEnvironmentVariable('COGNITO_USER_POOL_ID');
+const ISSUER_URL = USER_POOL_ID
+  ? `https://cognito-idp.${AWS_REGION}.amazonaws.com/${USER_POOL_ID}`
+  : getEnvironmentVariable('COGNITO_ISSUER_URL');
 const COGNITO = {
-  USER_POOL_ID: getEnvironmentVariable('COGNITO_USER_POOL_ID'),
+  USER_POOL_ID,
   USER_POOL_CLIENT_ID: getEnvironmentVariable('COGNITO_USER_POOL_CLIENT_ID'),
   IDENTITY_POOL_ID: getEnvironmentVariable('COGNITO_IDENTITY_POOL_ID'),
-  REGION: AWS_REGION
+  REGION: AWS_REGION,
+  ISSUER_URL,
+  JWKS_URL: ISSUER_URL ? `${ISSUER_URL}/.well-known/jwks.json` : '',
 };
 
 // SNS
