@@ -14,7 +14,7 @@ const createItem = async (tableName, item) => {
     createdAt: item.createdAt || new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   };
-  console.log("Creating item with params:", JSON.stringify({ TableName: tableName, Item: itemWithDefaults }, null, 2));
+  console.info("Creating DynamoDB item", { tableName });
   await client.send(new PutItemCommand({
     TableName: tableName,
     Item: marshall(itemWithDefaults),
@@ -24,7 +24,7 @@ const createItem = async (tableName, item) => {
 
 const getItemById = async (tableName, incidentId) => {
   if (!incidentId) {
-    console.error("Invalid incidentId provided:", incidentId);
+    console.warn("DynamoDB lookup rejected: missing identifier");
     return null;
   }
 
@@ -32,19 +32,12 @@ const getItemById = async (tableName, incidentId) => {
     TableName: tableName,
     Key: marshall({ incidentId }),
   };
-  console.log("Getting item with params:", JSON.stringify(params, null, 2));
+  console.debug("Reading DynamoDB item", { tableName });
   try {
     const result = await client.send(new GetItemCommand(params));
     return result.Item ? unmarshall(result.Item) : null;
   } catch (error) {
-    console.error("Error getting item:", {
-      message: error.message,
-      code: error.code,
-      name: error.name,
-      stack: error.stack,
-      statusCode: error.$metadata?.httpStatusCode,
-      params: params,
-    });
+    console.error("DynamoDB read failed", { tableName, name: error.name || "Error", code: error.code, statusCode: error.$metadata?.httpStatusCode });
     throw error; // Propagate error to caller
   }
 };
@@ -74,7 +67,7 @@ const updateItem = async (tableName, incidentId, updates) => {
     ExpressionAttributeNames,
     ReturnValues: "ALL_NEW",
   };
-  console.log("Updating item with params:", JSON.stringify(params, null, 2));
+  console.info("Updating DynamoDB item", { tableName });
   const result = await client.send(new UpdateItemCommand(params));
   return result.Attributes ? unmarshall(result.Attributes) : null;
 };
@@ -84,41 +77,27 @@ const deleteItem = async (tableName, incidentId) => {
     TableName: tableName,
     Key: marshall({ incidentId }),
   };
-  console.log("Deleting item with params:", JSON.stringify(params, null, 2));
+  console.info("Deleting DynamoDB item", { tableName });
   await client.send(new DeleteItemCommand(params));
 };
 
 const scanTable = async (params) => {
-  console.log("Executing scan with params:", JSON.stringify(params, null, 2));
-  console.log("DynamoDBClient config:", JSON.stringify({
-    region: client.config.region,
-    endpoint: client.config.endpoint ? client.config.endpoint.toString() : "undefined",
-    credentials: client.config.credentials ? "set" : "unset",
-  }, null, 2));
+  console.debug("Executing DynamoDB scan", { tableName: params.TableName });
+
   try {
     const command = new ScanCommand(params);
     const result = await client.send(command);
-    console.log("Scan result Items:", JSON.stringify(result.Items, null, 2));
+    console.debug("DynamoDB scan completed", { tableName: params.TableName, count: result.Items?.length || 0 });
     return result.Items ? result.Items.map(item => unmarshall(item)) : [];
   } catch (error) {
-    console.error("Scan error:", JSON.stringify({
-      message: error.message,
-      code: error.code,
-      name: error.name,
-      stack: error.stack,
-      statusCode: error.$metadata?.httpStatusCode,
-    }, null, 2));
+    console.error("DynamoDB scan failed", { tableName: params.TableName, name: error.name || "Error", code: error.code, statusCode: error.$metadata?.httpStatusCode });
     throw error;
   }
 };
 
 const queryTable = async (params) => {
-  console.log("Executing query with params:", JSON.stringify(params, null, 2));
-  console.log("DynamoDBClient config:", JSON.stringify({
-    region: client.config.region,
-    endpoint: client.config.endpoint ? client.config.endpoint.toString() : "undefined",
-    credentials: client.config.credentials ? "set" : "unset",
-  }, null, 2));
+  console.debug("Executing DynamoDB query", { tableName: params.TableName });
+
   try {
     let allItems = [];
     let lastEvaluatedKey = null;
@@ -130,16 +109,10 @@ const queryTable = async (params) => {
       allItems = allItems.concat(result.Items ? result.Items.map(item => unmarshall(item)) : []);
       lastEvaluatedKey = result.LastEvaluatedKey;
     } while (lastEvaluatedKey);
-    console.log("Query result:", JSON.stringify(allItems, null, 2));
+    console.debug("DynamoDB query completed", { tableName: params.TableName, count: allItems.length });
     return allItems;
   } catch (error) {
-    console.error("Query error:", JSON.stringify({
-      message: error.message,
-      code: error.code,
-      name: error.name,
-      stack: error.stack,
-      statusCode: error.$metadata?.httpStatusCode,
-    }, null, 2));
+    console.error("DynamoDB query failed", { tableName: params.TableName, name: error.name || "Error", code: error.code, statusCode: error.$metadata?.httpStatusCode });
     throw error;
   }
 };
