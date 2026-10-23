@@ -55,7 +55,8 @@
     "react-native-vector-icons": "^10.2.0",
     "react-native-worklets": "0.10.1",
     "tailwindcss": "^3.4.17",
-    "web-vitals": "^2.1.4"
+    "web-vitals": "^2.1.4",
+    "expo-secure-store": "~57.0.0"
   },
   "devDependencies": {
     "@babel/core": "^7.29.0",
