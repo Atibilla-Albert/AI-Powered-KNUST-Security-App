@@ -53,24 +53,24 @@ const defineRoutes = () => ({
 
   // Users
   '/users': {
-    post: { handler: loggingMiddleware(userHandlers.createUser) },
-    get: { handler: loggingMiddleware(userHandlers.listUsers) },
+    post: { handler: loggingMiddleware(userHandlers.createUser), middleware: [lambdaAuthenticate, lambdaAuthorize([USER_ROLES.ADMIN])] },
+    get: { handler: loggingMiddleware(userHandlers.listUsers), middleware: [lambdaAuthenticate, lambdaAuthorize([USER_ROLES.ADMIN])] },
   },
   '/users/:id': {
-    get: { handler: loggingMiddleware(userHandlers.getUser) },
-    put: { handler: loggingMiddleware(userHandlers.updateUser) },
-    delete: { handler: loggingMiddleware(userHandlers.deleteUser) },
+    get: { handler: loggingMiddleware(userHandlers.getUser), middleware: [lambdaAuthenticate, lambdaAuthorize([USER_ROLES.ADMIN])] },
+    put: { handler: loggingMiddleware(userHandlers.updateUser), middleware: [lambdaAuthenticate, lambdaAuthorize([USER_ROLES.ADMIN])] },
+    delete: { handler: loggingMiddleware(userHandlers.deleteUser), middleware: [lambdaAuthenticate, lambdaAuthorize([USER_ROLES.ADMIN])] },
   },
 
   // Incidents
   '/incidents': {
     post: { handler: loggingMiddleware(incidentHandlers.reportIncident), middleware: [lambdaAuthenticate] },
-    get: { handler: loggingMiddleware(incidentHandlers.listIncidents), middleware: [lambdaAuthenticate] },
+    get: { handler: loggingMiddleware(incidentHandlers.listIncidents), middleware: [lambdaAuthenticate, lambdaAuthorize([USER_ROLES.SECURITY_PERSONNEL, USER_ROLES.ADMIN])] },
   },
   '/incidents/:id': { // Changed from :incidentId to :id for consistency
-    get: { handler: loggingMiddleware(incidentHandlers.getIncident), middleware: [lambdaAuthenticate] },
-    put: { handler: loggingMiddleware(incidentHandlers.updateIncidentStatus), middleware: [lambdaAuthenticate] },
-    delete: { handler: loggingMiddleware(incidentHandlers.deleteIncident), middleware: [lambdaAuthenticate] },
+    get: { handler: loggingMiddleware(incidentHandlers.getIncident), middleware: [lambdaAuthenticate, lambdaAuthorize([USER_ROLES.SECURITY_PERSONNEL, USER_ROLES.ADMIN])] },
+    put: { handler: loggingMiddleware(incidentHandlers.updateIncidentStatus), middleware: [lambdaAuthenticate, lambdaAuthorize([USER_ROLES.SECURITY_PERSONNEL, USER_ROLES.ADMIN])] },
+    delete: { handler: loggingMiddleware(incidentHandlers.deleteIncident), middleware: [lambdaAuthenticate, lambdaAuthorize([USER_ROLES.ADMIN])] },
   },
   '/incidents/:id/assign': {
     post: { 
