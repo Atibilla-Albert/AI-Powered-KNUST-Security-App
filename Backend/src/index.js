@@ -2,11 +2,9 @@
 require('dotenv').config();
 
 const { defineRoutes } = require('./routes/routes');
+const { lambdaAuthenticate } = require('./auth/authMiddleware');
 const routes = defineRoutes();
 
-console.log('=== ENVIRONMENT VARIABLES ===');
-console.log('COGNITO_USER_POOL_CLIENT_ID:', process.env.COGNITO_USER_POOL_CLIENT_ID);
-console.log('AWS_REGION:', process.env.AWS_REGION);
 
 exports.api = async (event, context) => {
   const method = event.httpMethod ? event.httpMethod.toLowerCase() : 'get';
@@ -55,13 +53,23 @@ exports.api = async (event, context) => {
   // If the route is an object with handler/middleware, use handler
   const handlerObj = typeof route[method] === 'function' ? { handler: route[method] } : route[method];
 
-  // Middleware support (if any)
-  if (handlerObj.middleware && Array.isArray(handlerObj.middleware)) {
-    for (const mw of handlerObj.middleware) {
-      const mwResult = await mw(event, context);
-      if (mwResult && mwResult.statusCode && mwResult.statusCode !== 200) {
-        return mwResult;
-      }
+  // Only authentication endpoints are public. Every other route is authenticated
+  // unless it explicitly declares stricter middleware above.
+  const publicAuthPaths = new Set([
+    '/auth/register', '/auth/confirm', '/auth/login', '/auth/refresh',
+    '/auth/forgot-password', '/auth/confirm-forgot-password',
+    '/auth/resend-confirmation'
+  ]);
+  const middleware = Array.isArray(handlerObj.middleware) ? handlerObj.middleware : [];
+  if (middleware.length === 0 && !publicAuthPaths.has(routeKey)) {
+    const authResult = await lambdaAuthenticate(event, context);
+    if (!authResult.isAuthorized) return authResult;
+  }
+
+  for (const mw of middleware) {
+    const mwResult = await mw(event, context);
+    if (mwResult && mwResult.statusCode && mwResult.statusCode !== 200) {
+      return mwResult;
     }
   }
 
