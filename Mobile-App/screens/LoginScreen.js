@@ -13,10 +13,11 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import Icon from 'react-native-vector-icons/MaterialIcons'; // For eye icon
-import { loginUser, setTokens, clearTokens } from '../Services/api';
+import { useAuth } from '../authContext';
 
 export default function LoginScreen({ navigation }) {
   const isDark = useColorScheme() === 'dark';
+  const { signIn } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -25,20 +26,7 @@ export default function LoginScreen({ navigation }) {
   const handleLogin = async () => {
     setLoading(true);
     try {
-      const response = await loginUser({ email, password });
-
-      const tokens = response.data?.tokens;
-
-      const accessToken = tokens?.AccessToken || tokens?.accessToken;
-      const refreshToken = tokens?.RefreshToken || tokens?.refreshToken;
-      const idToken = tokens?.IdToken || tokens?.idToken;
-
-      if (!accessToken) {
-        throw new Error("Login succeeded but no token received.");
-      }
-
-      await clearTokens();
-      await setTokens({ accessToken, refreshToken });
+      await signIn(email, password);
 
       navigation.navigate("Dashboard");
     } catch (err) {
@@ -60,8 +48,7 @@ export default function LoginScreen({ navigation }) {
       } else if (err.message) {
         errorMessage = err.message;
       }
-      // Ensure a partially established session is not retained after a failed login.
-      await clearTokens();
+
 
       Alert.alert("Login Failed", errorMessage);
     } finally {
