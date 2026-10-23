@@ -125,8 +125,8 @@ functions:
     timeout: 30
     environment:
       POWERTOOLS_SERVICE_NAME: fraud-assessment
-      POWERTOOLS_TRACER_CAPTURE_RESPONSE: true
-      POWERTOOLS_TRACER_CAPTURE_ERROR: true
+      POWERTOOLS_TRACER_CAPTURE_RESPONSE: false
+      POWERTOOLS_TRACER_CAPTURE_ERROR: false
 
 plugins:
   - serverless-offline
@@ -273,6 +273,10 @@ resources:
         ClientName: ${self:custom.clientName}
         UserPoolId: !Ref CognitoUserPoolV2
         GenerateSecret: false
+        WriteAttributes:
+          - email
+          - custom:firstName
+          - custom:lastName
         ExplicitAuthFlows:
           - ALLOW_USER_PASSWORD_AUTH
           - ALLOW_REFRESH_TOKEN_AUTH
