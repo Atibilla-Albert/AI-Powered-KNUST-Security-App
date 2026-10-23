@@ -198,6 +198,7 @@ const NOTIFICATION_SETTINGS = {
 const cognitoUserPoolId = getEnvironmentVariable('COGNITO_USER_POOL_ID');
 const cognitoClientId = getEnvironmentVariable('COGNITO_USER_POOL_CLIENT_ID');
 const cognitoIssuer = getEnvironmentVariable('COGNITO_ISSUER_URL');
+const awsRegion = getEnvironmentVariable('AWS_REGION', 'us-east-1');
 
 // DynamoDB table names (update with your actual table names)
 const TABLES = {
@@ -218,5 +219,6 @@ module.exports = {
   cognitoUserPoolId,
   cognitoClientId,
   cognitoIssuer,
+  awsRegion,
   TABLES,
 };
