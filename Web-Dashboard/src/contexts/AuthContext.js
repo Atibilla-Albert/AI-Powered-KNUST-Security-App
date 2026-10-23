@@ -12,12 +12,36 @@ export const AuthProvider = ({ children }) => {
   useEffect(() => {
     const storedUser = localStorage.getItem('authUser');
     if (storedUser) {
-      setUser(JSON.parse(storedUser));
-      setLoading(false);
+      try {
+        const parsedUser = JSON.parse(storedUser);
+        // Optional: Quick token validation (e.g., for JWT expiry)
+        const token = localStorage.getItem('authToken');
+        if (token && parsedUser.signInUserSession?.accessToken?.payload?.exp * 1000 > Date.now()) {
+          setUser(parsedUser);
+        } else {
+          // Invalid/expired: clear and fallback
+          localStorage.removeItem('authUser');
+          localStorage.removeItem('authToken');
+          throw new Error('Token expired');
+        }
+        setLoading(false);
+      } catch (err) {
+        console.error('Invalid stored user:', err);
+        localStorage.removeItem('authUser');
+        localStorage.removeItem('authToken');
+        setUser(null);
+        setLoading(false);
+      }
     } else {
       authService.getCurrentAuthenticatedUser()
         .then((currentUser) => {
-          setUser(currentUser);
+          if (currentUser) {
+            setUser(currentUser);
+            // Re-store if fetched successfully
+            localStorage.setItem('authUser', JSON.parse(currentUser));
+          } else {
+            setUser(null);
+          }
           setLoading(false);
         })
         .catch(() => {
@@ -34,6 +58,7 @@ export const AuthProvider = ({ children }) => {
     try {
       const user = await authService.signIn(username, password);
       setUser(user);
+      localStorage.setItem('authUser', JSON.stringify(user));
       return user;
     } catch (err) {
       const msg = err.message || 'Login failed';
@@ -50,6 +75,8 @@ export const AuthProvider = ({ children }) => {
     try {
       await authService.signOut();
       setUser(null);
+      localStorage.removeItem('authUser');
+      localStorage.removeItem('authToken');
     } catch (err) {
       setError(err.message || 'Failed to sign out');
       throw err;
