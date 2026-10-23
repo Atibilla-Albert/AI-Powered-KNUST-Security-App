@@ -3,7 +3,7 @@ const jwkToPem = require("jwk-to-pem");
 const axios = require("axios");
 const { COGNITO } = require("../config/aws-config");
 const { USER_ROLES } = require("../config/config");
-const userRepo = require("../data/repositories/userRepo");
+const { getUserRoleById } = require("./userRole");
 const { unauthorizedResponse, forbiddenResponse } = require("../utils/api-response");
 
 let jwksCache = null;
@@ -100,14 +100,11 @@ const lambdaAuthenticate = async (event, context) => {
 
     // Authorization roles are sourced from the server-controlled application record,
     // never from a client-writable Cognito custom attribute or UI-supplied value.
-    const appUser = await userRepo.getUserById(claims.sub);
-    if (!appUser) {
+    const role = await getUserRoleById(claims.sub);
+    if (!role) {
       return unauthorizedResponse("User profile is not provisioned", "USER_PROFILE_NOT_FOUND", requestId);
     }
 
-    const role = Object.values(USER_ROLES).includes(appUser.role)
-      ? appUser.role
-      : USER_ROLES.REGULAR_USER;
     const groups = Array.isArray(claims["cognito:groups"]) ? claims["cognito:groups"] : [];
 
     return {
