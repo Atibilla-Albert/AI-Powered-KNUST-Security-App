@@ -12,7 +12,7 @@ import {
   Alert,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { setTokens } from '../Services/api';
+import { setTokens, clearTokens } from '../Services/api';
 import Icon from 'react-native-vector-icons/MaterialIcons'; // For eye icon
 import { loginUser } from '../Services/api'; // Import the login API function
 
@@ -37,6 +37,7 @@ export default function LoginScreen({ navigation }) {
         throw new Error("Login succeeded but no token received.");
       }
 
+      await clearTokens();
       await setTokens({ accessToken, refreshToken });
 
       navigation.navigate("Dashboard");
