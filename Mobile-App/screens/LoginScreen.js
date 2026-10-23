@@ -12,9 +12,8 @@ import {
   Alert,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import Icon from 'react-native-vector-icons/MaterialIcons'; // For eye icon
-import { loginUser } from '../Services/api'; // Import the login API function
+import { loginUser, setTokens, clearTokens } from '../Services/api';
 
 export default function LoginScreen({ navigation }) {
   const isDark = useColorScheme() === 'dark';
@@ -27,7 +26,6 @@ export default function LoginScreen({ navigation }) {
     setLoading(true);
     try {
       const response = await loginUser({ email, password });
-      console.log("Login response:", response);
 
       const tokens = response.data?.tokens;
 
@@ -39,13 +37,11 @@ export default function LoginScreen({ navigation }) {
         throw new Error("Login succeeded but no token received.");
       }
 
-      await AsyncStorage.setItem('accessToken', accessToken);
-      await AsyncStorage.setItem('refreshToken', refreshToken || '');
-      await AsyncStorage.setItem('idToken', idToken || '');
+      await clearTokens();
+      await setTokens({ accessToken, refreshToken });
 
       navigation.navigate("Dashboard");
     } catch (err) {
-      console.log("Login error:", err);
       let errorMessage = "An unexpected error occurred. Please try again.";
 
       // Handle Axios errors
@@ -64,6 +60,8 @@ export default function LoginScreen({ navigation }) {
       } else if (err.message) {
         errorMessage = err.message;
       }
+      // Ensure a partially established session is not retained after a failed login.
+      await clearTokens();
 
       Alert.alert("Login Failed", errorMessage);
     } finally {
