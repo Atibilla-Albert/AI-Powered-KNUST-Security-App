@@ -98,14 +98,7 @@ api.interceptors.request.use(
 // ------------------ Response Interceptor ------------------
 api.interceptors.response.use(
   (res) => {
-    if (__DEV__) {
-      console.log('API response received', {
-        url: res.config.url,
-        method: res.config.method,
-        status: res.status,
-        data: res.data,
-      });
-    }
+    // Do not log response bodies: auth responses include bearer/refresh tokens and other APIs return sensitive data.
     return res;
   },
   async (error) => {
@@ -170,13 +163,7 @@ api.interceptors.response.use(
 
         return api(originalRequest);
       } catch (e) {
-        if (__DEV__) {
-          console.error('Token refresh failed:', {
-            message: e.message,
-            status: e.response?.status,
-            data: e.response?.data,
-          });
-        }
+        if (__DEV__) console.warn('Token refresh failed', { status: e.response?.status, code: e.code });
 
         // Determine if refresh token is invalid/expired
         const errCode =
