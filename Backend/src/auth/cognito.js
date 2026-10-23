@@ -58,13 +58,13 @@ const handleCognitoError = (error, operation) => {
     return errorResponse('Invalid credentials', 401);
   }
   if (error.name === 'UserNotFoundException') {
-    return errorResponse('User not found', 404);
+    return errorResponse('Invalid email or password', 401);
   }
   if (error.name === 'CodeMismatchException') {
     return errorResponse('Invalid verification code', 400);
   }
 
-  return errorResponse(error.message || `Cognito ${operation} failed`, 400);
+  return errorResponse(`Unable to complete ${operation}. Please check the supplied details and try again.`, 400);
 };
 
 // Register user with required custom attributes
