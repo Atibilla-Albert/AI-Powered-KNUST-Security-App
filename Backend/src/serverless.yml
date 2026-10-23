@@ -65,7 +65,13 @@ provider:
         - Effect: Allow
           Action:
             - sns:Publish
+            - sns:Subscribe
           Resource: !Ref IncidentAlertsTopic
+        - Effect: Allow
+          Action:
+            - ses:SendEmail
+            - ses:SendRawEmail
+          Resource: "*"
         - Effect: Allow
           Action:
             - rekognition:DetectLabels
