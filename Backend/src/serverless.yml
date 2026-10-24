@@ -168,10 +168,11 @@ resources:
         BillingMode: PAY_PER_REQUEST
         StreamSpecification:
           StreamViewType: NEW_IMAGE
+        # Use DynamoDB's AWS-owned encryption key by default. Do not pin this
+        # table to a KMS key from a different AWS account. Configure a customer-
+        # managed key explicitly only when that key exists in the target account.
         SSESpecification:
           SSEEnabled: true
-          SSEType: KMS
-          KMSMasterKeyId: arn:aws:kms:us-east-1:717279717548:key/ac1be4af-138b-45af-80e4-1e9d1b09e7c8
         TimeToLiveSpecification:
           AttributeName: expiresAt
           Enabled: true
