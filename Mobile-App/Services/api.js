@@ -1,5 +1,5 @@
 import axios from 'axios';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as SecureStore from 'expo-secure-store';
 
 // ------------------ Configuration ------------------
 const API_BASE_URL =
@@ -35,12 +35,16 @@ const withRetry = async (fn, retries = 2, baseDelay = 500) => {
 
 // ------------------ Token Helpers ------------------
 export const setTokens = async ({ accessToken, refreshToken }) => {
-  if (accessToken) await AsyncStorage.setItem('accessToken', accessToken);
-  if (refreshToken) await AsyncStorage.setItem('refreshToken', refreshToken);
+  if (accessToken) await SecureStore.setItemAsync('accessToken', accessToken);
+  if (refreshToken) await SecureStore.setItemAsync('refreshToken', refreshToken);
 };
 
 export const clearTokens = async () => {
-  await AsyncStorage.multiRemove(['accessToken', 'refreshToken']);
+  await Promise.all([
+    SecureStore.deleteItemAsync('accessToken'),
+    SecureStore.deleteItemAsync('refreshToken'),
+    SecureStore.deleteItemAsync('idToken'),
+  ]);
 };
 
 export const forceLogout = async (navigation) => {
@@ -69,8 +73,10 @@ const processQueue = (error, token = null) => {
 // ------------------ Request Interceptor ------------------
 api.interceptors.request.use(
   async (config) => {
-    const token = await AsyncStorage.getItem('accessToken');
+    const isPublicAuthRoute = config.url?.startsWith('/auth/');
+    const token = isPublicAuthRoute ? null : await SecureStore.getItemAsync('accessToken');
     if (token) {
+      config.headers = config.headers || {};
       config.headers.Authorization = `Bearer ${token}`;
       if (__DEV__) {
         console.log('Added Authorization header', {
@@ -94,14 +100,7 @@ api.interceptors.request.use(
 // ------------------ Response Interceptor ------------------
 api.interceptors.response.use(
   (res) => {
-    if (__DEV__) {
-      console.log('API response received', {
-        url: res.config.url,
-        method: res.config.method,
-        status: res.status,
-        data: res.data,
-      });
-    }
+    // Do not log response bodies: auth responses include bearer/refresh tokens and other APIs return sensitive data.
     return res;
   },
   async (error) => {
@@ -113,7 +112,8 @@ api.interceptors.response.use(
     const status = error.response?.status;
 
     // Handle 401 token refresh
-    if (status === 401 && !originalRequest._retry) {
+    const isPublicAuthRoute = originalRequest.url?.startsWith('/auth/');
+    if (status === 401 && !originalRequest._retry && !isPublicAuthRoute) {
       if (isRefreshing) {
         // Queue and wait for refresh to complete
         return new Promise((resolve, reject) => {
@@ -130,7 +130,7 @@ api.interceptors.response.use(
       isRefreshing = true;
 
       try {
-        const refreshToken = await AsyncStorage.getItem('refreshToken');
+        const refreshToken = await SecureStore.getItemAsync('refreshToken');
         if (!refreshToken) {
           if (__DEV__) console.warn('No refresh token available. Forcing logout.');
           await clearTokens();
@@ -166,13 +166,7 @@ api.interceptors.response.use(
 
         return api(originalRequest);
       } catch (e) {
-        if (__DEV__) {
-          console.error('Token refresh failed:', {
-            message: e.message,
-            status: e.response?.status,
-            data: e.response?.data,
-          });
-        }
+        if (__DEV__) console.warn('Token refresh failed', { status: e.response?.status, code: e.code });
 
         // Determine if refresh token is invalid/expired
         const errCode =
@@ -197,13 +191,11 @@ api.interceptors.response.use(
 
     // Log and propagate other errors
     if (__DEV__) {
-      console.error('API request failed:', {
+      console.warn('API request failed', {
         url: error.config?.url,
         method: error.config?.method,
         status: error.response?.status,
-        statusText: error.response?.statusText,
-        data: error.response?.data,
-        message: error.message,
+        code: error.code,
       });
     }
     return Promise.reject(error);
@@ -212,12 +204,12 @@ api.interceptors.response.use(
 
 // ------------------ AUTH API ------------------
 export const registerUser = (userData) => {
-  if (__DEV__) console.log('Registering user', { userData });
+  // Do not log registration payloads; they contain passwords and personal data.
   return api.post('/auth/register', userData);
 };
 
 export const confirmRegistration = (data) => {
-  if (__DEV__) console.log('Confirming registration', { data });
+  // Do not log verification codes or email addresses.
   return api.post('/auth/confirm', data);
 };
 
@@ -252,7 +244,7 @@ export const reportIncident = (incidentData) => {
   return api
     .post('/incidents', incidentData)
     .then((response) => {
-      if (__DEV__) console.log('Incident report successful', response.data);
+      // Incident responses can contain sensitive personal information.
       return response;
     })
     .catch((error) => {
@@ -283,14 +275,14 @@ export const getIncidentById = (id) => {
 };
 
 export const getIncidentMediaUploadUrl = (incidentId, filename, contentType) => {
-  if (__DEV__) console.log('Getting upload URL', { incidentId, filename, contentType });
+  // Upload URLs and incident metadata must not be written to logs.
   return api
     .post(`/incidents/${incidentId}/media/upload-url`, {
       filename,
       contentType,
     })
     .then((response) => {
-      if (__DEV__) console.log('Upload URL received', response.data);
+      // Presigned URLs are temporary bearer credentials; never log them.
       return response;
     })
     .catch((error) => {
@@ -307,7 +299,7 @@ export const getIncidentMediaUploadUrl = (incidentId, filename, contentType) => 
 
 // Upload to S3 (pre-signed)
 export const uploadToS3 = async (presignedUrl, fileUri, contentType) => {
-  if (__DEV__) console.log('Uploading to S3', { presignedUrl, fileUri, contentType });
+  // Never log presigned URLs or local file URIs.
 
   const response = await fetch(fileUri);
   const blob = await response.blob();
@@ -392,11 +384,9 @@ export const sendEmergencyAlert = async (
     throw new Error(`Unexpected status code ${response.status}`);
   } catch (error) {
     if (__DEV__) {
-      console.error('Emergency alert failed:', {
+      console.warn('Emergency alert failed', {
         status: error.response?.status,
-        data: error.response?.data,
-        message: error.message,
-        url: error.config?.url,
+        code: error.code,
         method: error.config?.method,
       });
     }

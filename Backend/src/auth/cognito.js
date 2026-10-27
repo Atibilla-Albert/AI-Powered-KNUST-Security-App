@@ -11,6 +11,8 @@ const {
 } = require("@aws-sdk/client-cognito-identity-provider");
 
 const config = require("../config/config");
+const awsConfig = require("../config/aws-config");
+const { getUserRoleById } = require("./userRole");
 const { errorResponse } = require("../utils/api-response");
 const { User } = require('../data/models/users');
 const { createItem } = require('../data/dynamodbclient');
@@ -33,7 +35,7 @@ function validateCognitoConfig() {
 }
 
 const cognitoClient = new CognitoIdentityProviderClient({
-  region: config.awsRegion
+  region: awsConfig.AWS_REGION
 });
 
 // Get user details from Cognito
@@ -49,26 +51,30 @@ async function getUserDetails(accessToken) {
 
 // Error handler
 const handleCognitoError = (error, operation) => {
-  console.error(`Cognito ${operation} error:`, {
+  const mapping = {
+    UsernameExistsException: [409, "An account with these details already exists"],
+    NotAuthorizedException: [401, "Invalid credentials or expired session"],
+    UserNotFoundException: [400, "Unable to complete authentication request"],
+    UserNotConfirmedException: [403, "Account confirmation is required"],
+    CodeMismatchException: [400, "Invalid verification code"],
+    ExpiredCodeException: [400, "Verification code has expired"],
+    TooManyRequestsException: [429, "Too many requests. Try again later"],
+    LimitExceededException: [429, "Too many requests. Try again later"],
+    InvalidPasswordException: [400, "Password does not meet the security requirements"],
+    InvalidParameterException: [400, "One or more registration details are not supported by the configured user pool. Check the account attributes and password policy."],
+  };
+  const [statusCode, message] = mapping[error.name] || [500, "Authentication service request failed"];
+  // Keep diagnostics useful without logging credentials or request payloads.
+  console.warn("Cognito operation failed", {
+    operation,
+    code: error.name || "UnknownError",
     message: error.message,
-    code: error.code,
-    stack: error.stack
+    requestId: error.$metadata?.requestId || error.requestId,
   });
-
-  if (error.name === 'UsernameExistsException') {
-    return errorResponse('User already exists', 409);
-  }
-  if (error.name === 'NotAuthorizedException') {
-    return errorResponse('Invalid credentials', 401);
-  }
-  if (error.name === 'UserNotFoundException') {
-    return errorResponse('User not found', 404);
-  }
-  if (error.name === 'CodeMismatchException') {
-    return errorResponse('Invalid verification code', 400);
-  }
-
-  return errorResponse(error.message || `Cognito ${operation} failed`, 400);
+  const safeError = new Error(message);
+  safeError.statusCode = statusCode;
+  safeError.code = error.name || "COGNITO_ERROR";
+  return safeError;
 };
 
 // Register user with required custom attributes
@@ -79,7 +85,8 @@ async function registerUser(email, password, attributes = {}) {
     throw new Error("Email and password are required");
   }
 
-  const { ['custom:firstName']: firstName, ['custom:lastName']: lastName } = attributes;
+  const firstName = attributes['custom:firstName'] || attributes.firstName;
+  const lastName = attributes['custom:lastName'] || attributes.lastName;
 
   if (!firstName || !lastName) {
     throw new Error("First name and last name are required");
@@ -90,18 +97,16 @@ async function registerUser(email, password, attributes = {}) {
       Name: 'email',
       Value: email
     },
+    // Use Cognito's standard name attributes so registration also works with
+    // existing User Pools that do not have the optional custom attributes.
     {
-      Name: 'custom:firstName',
+      Name: 'given_name',
       Value: firstName
     },
     {
-      Name: 'custom:lastName',
+      Name: 'family_name',
       Value: lastName
     },
-    {
-      Name: 'custom:role',
-      Value: attributes['custom:role'] || 'REGULAR_USER'
-    }
   ];
 
   const command = new SignUpCommand({
@@ -165,12 +170,15 @@ async function authenticate(email, password) {
   try {
     const response = await cognitoClient.send(command);
     const user = await getUserDetails(response.AuthenticationResult.AccessToken);
-    // if (user['custom:role'] !== 'ADMIN') {
-    //   throw new Error('Unauthorized access');
-    // }
+    const role = user.sub ? await getUserRoleById(user.sub) : null;
+    if (!role) {
+      const profileError = new Error("User profile is not provisioned");
+      profileError.statusCode = 403;
+      throw profileError;
+    }
     return {
       ...response.AuthenticationResult,
-      role: user['custom:role']
+      role
     };
   } catch (error) {
     throw handleCognitoError(error, 'authentication');
@@ -277,7 +285,8 @@ async function registerUserHandler(event) {
     // Auto-extract full name fields
     const firstName = attributes['custom:firstName'] || attributes.firstName || '';
     const lastName = attributes['custom:lastName'] || attributes.lastName || '';
-    const role = attributes['custom:role'] || attributes.role || 'REGULAR_USER';
+    // Public registration must never assign elevated privileges.
+    const role = 'REGULAR_USER';
 
     if (result && result.userId) {
       const user = new User({
@@ -300,7 +309,7 @@ async function registerUserHandler(event) {
       })
     };
   } catch (error) {
-    return errorResponse(error.message, 400);
+    return errorResponse(error.message || "Registration failed", error.statusCode || 400);
   }
 }
 
@@ -332,7 +341,7 @@ async function authenticateHandler(event) {
       })
     };
   } catch (error) {
-    return errorResponse(error.message, 400);
+    return errorResponse(error.message || "Authentication failed", error.statusCode || 400);
   }
 }
 
@@ -349,7 +358,7 @@ async function refreshTokensHandler(event) {
       })
     };
   } catch (error) {
-    return errorResponse(error.message, 400);
+    return errorResponse(error.message || "Token refresh failed", error.statusCode || 400);
   }
 }
 

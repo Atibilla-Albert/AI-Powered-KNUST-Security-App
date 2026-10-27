@@ -10,34 +10,25 @@ const { USER_ROLES } = require('../config/config');
 const { Logger } = require('@aws-lambda-powertools/logger');
 
 const logger = new Logger({ serviceName: 'security-incident-reporting' });
-const isDev = (process.env.STAGE || 'dev') === 'dev';
 
-// Logging middleware for request and response
+// Log metadata only. Never log request headers, bodies, tokens, passwords,
+// presigned URLs, or response bodies.
 const loggingMiddleware = (handler) => async (event, context) => {
-  logger.info('Incoming request', {
+  const metadata = {
     path: event.path,
     method: event.httpMethod,
-    headers: event.headers,
-    body: event.body ? JSON.parse(event.body) : null,
-    queryStringParameters: event.queryStringParameters,
-  });
-
+    requestId: context?.awsRequestId || event.requestContext?.requestId,
+  };
+  logger.info("Request received", metadata);
   try {
     const response = await handler(event, context);
-    logger.info('Request completed', {
-      path: event.path,
-      method: event.httpMethod,
-      statusCode: response.statusCode,
-      response: response.body ? JSON.parse(response.body) : null,
-    });
+    logger.info("Request completed", { ...metadata, statusCode: response?.statusCode });
     return response;
   } catch (error) {
-    logger.error('Request failed', {
-      path: event.path,
-      method: event.httpMethod,
-      error: error.message,
-      stack: error.stack,
-      statusCode: error.statusCode || 500,
+    logger.error("Request failed", {
+      ...metadata,
+      errorName: error?.name || "Error",
+      statusCode: error?.statusCode || 500,
     });
     throw error;
   }
@@ -55,29 +46,29 @@ const defineRoutes = () => ({
 
   // Users
   '/users': {
-    post: { handler: loggingMiddleware(userHandlers.createUser) },
-    get: { handler: loggingMiddleware(userHandlers.listUsers) },
+    post: { handler: loggingMiddleware(userHandlers.createUser), middleware: [lambdaAuthenticate, lambdaAuthorize([USER_ROLES.ADMIN])] },
+    get: { handler: loggingMiddleware(userHandlers.listUsers), middleware: [lambdaAuthenticate, lambdaAuthorize([USER_ROLES.ADMIN])] },
   },
   '/users/:id': {
-    get: { handler: loggingMiddleware(userHandlers.getUser) },
-    put: { handler: loggingMiddleware(userHandlers.updateUser) },
-    delete: { handler: loggingMiddleware(userHandlers.deleteUser) },
+    get: { handler: loggingMiddleware(userHandlers.getUser), middleware: [lambdaAuthenticate, lambdaAuthorize([USER_ROLES.ADMIN])] },
+    put: { handler: loggingMiddleware(userHandlers.updateUser), middleware: [lambdaAuthenticate, lambdaAuthorize([USER_ROLES.ADMIN])] },
+    delete: { handler: loggingMiddleware(userHandlers.deleteUser), middleware: [lambdaAuthenticate, lambdaAuthorize([USER_ROLES.ADMIN])] },
   },
 
   // Incidents
   '/incidents': {
     post: { handler: loggingMiddleware(incidentHandlers.reportIncident), middleware: [lambdaAuthenticate] },
-    get: { handler: loggingMiddleware(incidentHandlers.listIncidents), middleware: [lambdaAuthenticate] },
+    get: { handler: loggingMiddleware(incidentHandlers.listIncidents), middleware: [lambdaAuthenticate, lambdaAuthorize([USER_ROLES.SECURITY_PERSONNEL, USER_ROLES.ADMIN])] },
   },
   '/incidents/:id': { // Changed from :incidentId to :id for consistency
-    get: { handler: loggingMiddleware(incidentHandlers.getIncident), middleware: [lambdaAuthenticate] },
-    put: { handler: loggingMiddleware(incidentHandlers.updateIncidentStatus), middleware: [lambdaAuthenticate] },
-    delete: { handler: loggingMiddleware(incidentHandlers.deleteIncident), middleware: [lambdaAuthenticate] },
+    get: { handler: loggingMiddleware(incidentHandlers.getIncident), middleware: [lambdaAuthenticate, lambdaAuthorize([USER_ROLES.SECURITY_PERSONNEL, USER_ROLES.ADMIN])] },
+    put: { handler: loggingMiddleware(incidentHandlers.updateIncidentStatus), middleware: [lambdaAuthenticate, lambdaAuthorize([USER_ROLES.SECURITY_PERSONNEL, USER_ROLES.ADMIN])] },
+    delete: { handler: loggingMiddleware(incidentHandlers.deleteIncident), middleware: [lambdaAuthenticate, lambdaAuthorize([USER_ROLES.ADMIN])] },
   },
   '/incidents/:id/assign': {
     post: { 
       handler: loggingMiddleware(incidentHandlers.assignIncidentToDepartment), 
-      middleware: isDev ? [] : [lambdaAuthenticate, lambdaAuthorize([USER_ROLES.SECURITY_PERSONNEL, USER_ROLES.ADMIN])] 
+      middleware: [lambdaAuthenticate, lambdaAuthorize([USER_ROLES.SECURITY_PERSONNEL, USER_ROLES.ADMIN])] 
     },
   },
   '/incidents/my': {
@@ -89,23 +80,23 @@ const defineRoutes = () => ({
   '/departments': {
     get: { 
       handler: loggingMiddleware(incidentHandlers.getDepartments), 
-      middleware: isDev ? [] : [lambdaAuthenticate] 
+      middleware: [lambdaAuthenticate, lambdaAuthorize([USER_ROLES.SECURITY_PERSONNEL, USER_ROLES.ADMIN])] 
     },
   },
 
   // S3 Upload
   '/incidents/:id/media/upload-url': { // Changed from :incidentId to :id
-    post: { handler: loggingMiddleware(s3Handlers.getIncidentMediaUploadUrl), middleware: [lambdaAuthenticate] },
+    post: { handler: loggingMiddleware(s3Handlers.getIncidentMediaUploadUrl), middleware: [lambdaAuthenticate, lambdaAuthorize([USER_ROLES.SECURITY_PERSONNEL, USER_ROLES.ADMIN])] },
   },
 
   // S3 Add Attachment
   '/incidents/:id/media': {
-    post: { handler: loggingMiddleware(s3Handlers.addIncidentAttachment), middleware: [lambdaAuthenticate] },
+    post: { handler: loggingMiddleware(s3Handlers.addIncidentAttachment), middleware: [lambdaAuthenticate, lambdaAuthorize([USER_ROLES.SECURITY_PERSONNEL, USER_ROLES.ADMIN])] },
   },
 
   // S3 Download
   '/incidents/:id/media/download-url': { // Changed from :incidentId to :id
-    get: { handler: loggingMiddleware(s3Handlers.getIncidentMediaDownloadUrl), middleware: [lambdaAuthenticate] },
+    get: { handler: loggingMiddleware(s3Handlers.getIncidentMediaDownloadUrl), middleware: [lambdaAuthenticate, lambdaAuthorize([USER_ROLES.SECURITY_PERSONNEL, USER_ROLES.ADMIN])] },
   },
 
   // Security
