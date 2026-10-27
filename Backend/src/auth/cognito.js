@@ -61,9 +61,16 @@ const handleCognitoError = (error, operation) => {
     TooManyRequestsException: [429, "Too many requests. Try again later"],
     LimitExceededException: [429, "Too many requests. Try again later"],
     InvalidPasswordException: [400, "Password does not meet the security requirements"],
+    InvalidParameterException: [400, "One or more registration details are not supported by the configured user pool. Check the account attributes and password policy."],
   };
   const [statusCode, message] = mapping[error.name] || [500, "Authentication service request failed"];
-  console.warn("Cognito operation failed", { operation, code: error.name || "UnknownError" });
+  // Keep diagnostics useful without logging credentials or request payloads.
+  console.warn("Cognito operation failed", {
+    operation,
+    code: error.name || "UnknownError",
+    message: error.message,
+    requestId: error.$metadata?.requestId || error.requestId,
+  });
   const safeError = new Error(message);
   safeError.statusCode = statusCode;
   safeError.code = error.name || "COGNITO_ERROR";
@@ -90,12 +97,14 @@ async function registerUser(email, password, attributes = {}) {
       Name: 'email',
       Value: email
     },
+    // Use Cognito's standard name attributes so registration also works with
+    // existing User Pools that do not have the optional custom attributes.
     {
-      Name: 'custom:firstName',
+      Name: 'given_name',
       Value: firstName
     },
     {
-      Name: 'custom:lastName',
+      Name: 'family_name',
       Value: lastName
     },
   ];
