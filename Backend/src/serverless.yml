@@ -3,7 +3,7 @@ frameworkVersion: '3'
 
 custom:
   tableName: ${self:service}-${self:provider.stage}-incidents
-  bucketName: ${self:service}-${self:provider.stage}-incident-media
+  bucketName: ${self:service}-${self:provider.stage}-${aws:accountId}-${aws:region}-media
   topicName: ${self:service}-${self:provider.stage}-incident-alerts
   userPoolName: ${self:service}-${self:provider.stage}-user-pool-v2
   clientName: ${self:service}-${self:provider.stage}-client
@@ -192,8 +192,9 @@ resources:
     IncidentMediaBucket:
       Type: AWS::S3::Bucket
       Properties:
+        # CloudFormation creates this bucket during deployment.
+        # Account ID and region make the globally unique S3 name predictable.
         BucketName: ${self:custom.bucketName}
-        AccessControl: Private
         PublicAccessBlockConfiguration:
           BlockPublicAcls: true
           IgnorePublicAcls: true
