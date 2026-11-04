@@ -3,13 +3,14 @@ import * as SecureStore from 'expo-secure-store';
 
 // ------------------ Configuration ------------------
 // Expo only inlines variables prefixed with EXPO_PUBLIC_.
-// Android Emulator reaches the host machine through 10.0.2.2.
-// For a physical device, set EXPO_PUBLIC_API_BASE_URL in Mobile-App/.env
-// to your computer's LAN IP (for example http://192.168.1.20:3000/dev).
+// For a physical iPhone using Expo Go, use your development computer's
+// LAN IPv4 address in Mobile-App/.env (same Wi-Fi network as the iPhone).
+// Example: EXPO_PUBLIC_API_BASE_URL=http://192.168.1.20:3000/dev
+// Android Emulator users can instead use http://10.0.2.2:3000/dev.
 const API_BASE_URL = (
   typeof process !== 'undefined' && process.env?.EXPO_PUBLIC_API_BASE_URL
     ? process.env.EXPO_PUBLIC_API_BASE_URL
-    : 'http://10.0.2.2:3000/dev'
+    : 'http://YOUR_COMPUTER_LAN_IP:3000/dev'
 ).replace(/\\/+$/, '');
 
 // ------------------ Axios instance ------------------
