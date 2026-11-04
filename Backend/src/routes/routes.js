@@ -35,6 +35,17 @@ const loggingMiddleware = (handler) => async (event, context) => {
 };
 
 const defineRoutes = () => ({
+  // Public endpoint used to verify mobile-to-backend connectivity.
+  '/health': {
+    get: {
+      handler: async () => ({
+        statusCode: 200,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'ok', service: 'security-incident-reporting' }),
+      }),
+    },
+  },
+
   // Auth routes
   '/auth/register': { post: { handler: loggingMiddleware(authHandlers.register) } },
   '/auth/confirm': { post: { handler: loggingMiddleware(authHandlers.confirmRegistration) } },
@@ -60,6 +71,12 @@ const defineRoutes = () => ({
     post: { handler: loggingMiddleware(incidentHandlers.reportIncident), middleware: [lambdaAuthenticate] },
     get: { handler: loggingMiddleware(incidentHandlers.listIncidents), middleware: [lambdaAuthenticate, lambdaAuthorize([USER_ROLES.SECURITY_PERSONNEL, USER_ROLES.ADMIN])] },
   },
+  '/incidents/my': {
+    get: {
+      handler: loggingMiddleware(incidentHandlers.listMyIncidents),
+      middleware: [lambdaAuthenticate],
+    },
+  },
   '/incidents/:id': { // Changed from :incidentId to :id for consistency
     get: { handler: loggingMiddleware(incidentHandlers.getIncident), middleware: [lambdaAuthenticate, lambdaAuthorize([USER_ROLES.SECURITY_PERSONNEL, USER_ROLES.ADMIN])] },
     put: { handler: loggingMiddleware(incidentHandlers.updateIncidentStatus), middleware: [lambdaAuthenticate, lambdaAuthorize([USER_ROLES.SECURITY_PERSONNEL, USER_ROLES.ADMIN])] },
@@ -69,12 +86,6 @@ const defineRoutes = () => ({
     post: { 
       handler: loggingMiddleware(incidentHandlers.assignIncidentToDepartment), 
       middleware: [lambdaAuthenticate, lambdaAuthorize([USER_ROLES.SECURITY_PERSONNEL, USER_ROLES.ADMIN])] 
-    },
-  },
-  '/incidents/my': {
-    get: {
-      handler: loggingMiddleware(incidentHandlers.listMyIncidents),
-      middleware: [lambdaAuthenticate],
     },
   },
   '/departments': {
