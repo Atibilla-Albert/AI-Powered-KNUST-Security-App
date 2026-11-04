@@ -52,7 +52,7 @@ export default function SignupScreen({ navigation }) {
   }
     };
 
-    console.log('Registering with:', payload);
+    // Never log signup payloads: they contain credentials and personal data.
 
     setLoading(true);
     try {
