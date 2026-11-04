@@ -2,10 +2,15 @@ import axios from 'axios';
 import * as SecureStore from 'expo-secure-store';
 
 // ------------------ Configuration ------------------
-const API_BASE_URL =
-  typeof process !== 'undefined' && process.env?.API_BASE_URL
-    ? process.env.API_BASE_URL
-    : 'http://172.20.10.4:3000/dev'; // adjust for emulator vs device if needed
+// Expo only inlines variables prefixed with EXPO_PUBLIC_.
+// Android Emulator reaches the host machine through 10.0.2.2.
+// For a physical device, set EXPO_PUBLIC_API_BASE_URL in Mobile-App/.env
+// to your computer's LAN IP (for example http://192.168.1.20:3000/dev).
+const API_BASE_URL = (
+  typeof process !== 'undefined' && process.env?.EXPO_PUBLIC_API_BASE_URL
+    ? process.env.EXPO_PUBLIC_API_BASE_URL
+    : 'http://10.0.2.2:3000/dev'
+).replace(/\\/+$/, '');
 
 // ------------------ Axios instance ------------------
 const api = axios.create({
@@ -84,13 +89,11 @@ api.interceptors.request.use(
           method: config.method,
         });
       }
-    } else {
-      if (__DEV__) {
-        console.warn('No access token found for request', {
-          url: config.url,
-          method: config.method,
-        });
-      }
+    } else if (!isPublicAuthRoute && __DEV__) {
+      console.warn('No access token found for protected request', {
+        url: config.url,
+        method: config.method,
+      });
     }
     return config;
   },
@@ -201,6 +204,9 @@ api.interceptors.response.use(
     return Promise.reject(error);
   }
 );
+
+// ------------------ HEALTH CHECK ------------------
+export const checkBackendHealth = () => api.get('/health');
 
 // ------------------ AUTH API ------------------
 export const registerUser = (userData) => {
