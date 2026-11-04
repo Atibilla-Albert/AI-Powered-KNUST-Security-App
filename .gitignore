@@ -10,7 +10,7 @@
 **/.env.test.local
 **/.env.production.local
 
-# Builds and distributions
+# Generated Serverless deployment artifacts\n**/.serverless/\n\n# Builds and distributions
 **/build/
 **/dist/
 **/web-build/
