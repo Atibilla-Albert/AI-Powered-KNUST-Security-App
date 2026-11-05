@@ -2,10 +2,14 @@ import axios from 'axios';
 import * as SecureStore from 'expo-secure-store';
 
 // ------------------ Configuration ------------------
-const API_BASE_URL =
-  typeof process !== 'undefined' && process.env?.API_BASE_URL
-    ? process.env.API_BASE_URL
-    : 'http://172.20.10.4:3000/dev'; // adjust for emulator vs device if needed
+// Expo only exposes client-side environment variables prefixed with EXPO_PUBLIC_.
+// Set this in Mobile-App/.env to the computer's LAN IP when testing on a physical device.
+const configuredApiBaseUrl =
+  typeof process !== 'undefined' ? process.env.EXPO_PUBLIC_API_BASE_URL : undefined;
+
+const API_BASE_URL = (
+  configuredApiBaseUrl || 'http://127.0.0.1:3000/dev'
+).replace(/\/+$/, '');
 
 // ------------------ Axios instance ------------------
 const api = axios.create({
