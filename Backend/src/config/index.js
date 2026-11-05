@@ -5,8 +5,8 @@ const loadConfig = () => {
   const stage = getEnvironmentVariable('STAGE', 'dev');
   
   // Directly use the values from your .env file
-  const cognitoUserPoolId = 'us-east-1_d5YngXjKC';
-  const cognitoClientId = '72ncbq4u2avoqdmfd58likbt9e';
+  const cognitoUserPoolId = 'us-east-1_J4TXm0GUq';
+  const cognitoClientId = '686ocid29sktcsu368vf48c4g';
 
   console.log('Loaded Cognito configuration:', {
     userPoolId: cognitoUserPoolId,
