@@ -35,6 +35,22 @@ const loggingMiddleware = (handler) => async (event, context) => {
 };
 
 const defineRoutes = () => ({
+  // Public health check
+  '/health': {
+    get: {
+      handler: async () => ({
+        statusCode: 200,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          success: true,
+          status: 'healthy',
+          service: 'security-incident-reporting',
+          timestamp: new Date().toISOString(),
+        }),
+      }),
+    },
+  },
+
   // Auth routes
   '/auth/register': { post: { handler: loggingMiddleware(authHandlers.register) } },
   '/auth/confirm': { post: { handler: loggingMiddleware(authHandlers.confirmRegistration) } },
