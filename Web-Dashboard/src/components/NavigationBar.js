@@ -5,6 +5,8 @@ import { Link, useNavigate } from 'react-router-dom';
 import MenuIcon from '@mui/icons-material/Menu';
 import LogoutIcon from '@mui/icons-material/Logout';
 import SecurityIcon from '@mui/icons-material/Security';
+import DarkModeIcon from '@mui/icons-material/DarkMode';
+import LightModeIcon from '@mui/icons-material/LightMode';
 import { useAuth} from '../contexts/AuthContext';
 
 const NavigationBar = () => {
@@ -13,6 +15,22 @@ const NavigationBar = () => {
   const [anchorEl, setAnchorEl] = React.useState(null);
   const open = Boolean(anchorEl);
   const { isAuthenticated, signOut } = useAuth();
+  const [isDarkMode, setIsDarkMode] = React.useState(() => {
+    try {
+      return window.localStorage.getItem('campsec-theme') === 'dark';
+    } catch (_) {
+      return false;
+    }
+  });
+
+  React.useEffect(() => {
+    document.documentElement.setAttribute('data-theme', isDarkMode ? 'dark' : 'light');
+    try {
+      window.localStorage.setItem('campsec-theme', isDarkMode ? 'dark' : 'light');
+    } catch (_) {
+      // Keep theme switching available when browser storage is disabled.
+    }
+  }, [isDarkMode]);
 
   const handleMenuClick = (event) => {
     setAnchorEl(event.currentTarget);
@@ -54,6 +72,14 @@ if (!isAuthenticated) return null;
         </Box>
 
         <Box display="flex" gap={2}>
+          <IconButton
+            color="inherit"
+            onClick={() => setIsDarkMode((dark) => !dark)}
+            aria-label={`Switch to ${isDarkMode ? 'light' : 'dark'} mode`}
+            title={`Switch to ${isDarkMode ? 'light' : 'dark'} mode`}
+          >
+            {isDarkMode ? <LightModeIcon /> : <DarkModeIcon />}
+          </IconButton>
           <Button color="inherit" component={Link} to="/">Dashboard</Button>
           <Button color="inherit" component={Link} to="/incidents">Incidents</Button>
           <Button color="inherit" component={Link} to="/incidents/map">Map View</Button>

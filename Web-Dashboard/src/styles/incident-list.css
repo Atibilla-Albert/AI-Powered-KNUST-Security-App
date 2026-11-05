@@ -2,7 +2,7 @@
 .incidents-page {
   padding: 24px;
   font-family: 'Roboto', sans-serif;
-  background-color: #f9f9f9;
+  background-color: #d2d8e1;
 }
 
 /* Header */
@@ -51,6 +51,7 @@
   font-size: 24px;
   font-weight: 600;
   margin: 0;
+  color: #88d7f4;
 }
 
 .incidents-actions .btn {
@@ -354,4 +355,141 @@
   color: white;
   border-radius: 4px;
   font-size: 12px;
+}
+
+/* Keep search and filter controls aligned across screen sizes. */
+.incidents-page {
+  max-width: 1800px;
+  margin: 0 auto;
+}
+
+.incidents-filters {
+  display: grid;
+  gap: 1rem;
+  padding: 1.25rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  box-shadow: 0 10px 24px rgba(25, 42, 70, 0.07);
+}
+
+.filter-row {
+  display: grid;
+  grid-template-columns: minmax(260px, 1.7fr) repeat(2, minmax(150px, 1fr));
+  align-items: end;
+  gap: 1rem;
+}
+
+.filter-row + .filter-row {
+  grid-template-columns: repeat(2, minmax(150px, 1fr)) auto;
+}
+
+.filter-group,
+.search-filter {
+  width: 100%;
+  min-width: 0;
+  flex: initial;
+}
+
+.filter-group label {
+  min-height: 1rem;
+  margin-bottom: 0.45rem;
+}
+
+.search-filter .search-icon {
+  top: calc(1rem + 0.45rem + 21px);
+  left: 0.85rem;
+}
+
+.filter-group .form-control {
+  width: 100%;
+  min-height: 44px;
+  box-sizing: border-box;
+  padding: 0.65rem 0.8rem;
+  border-radius: 9px;
+}
+
+.search-filter input.form-control {
+  padding-left: 2.5rem;
+}
+
+.filter-row + .filter-row .filter-group:last-child {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.filter-row + .filter-row .btn {
+  min-height: 44px;
+  white-space: nowrap;
+}
+
+html[data-theme='dark'] .incidents-page {
+  color: #e6edf7;
+}
+
+html[data-theme='dark'] .incidents-page .page-title {
+  color: #e6edf7;
+}
+
+html[data-theme='dark'] .incidents-filters,
+html[data-theme='dark'] .incidents-table-container {
+  background: #182331;
+  border-color: #2b394a;
+  color: #e6edf7;
+}
+
+html[data-theme='dark'] .filter-group label,
+html[data-theme='dark'] .incident-summary,
+html[data-theme='dark'] .total-incidents-count {
+  color: #a8b5c7;
+}
+
+html[data-theme='dark'] .filter-group .form-control,
+html[data-theme='dark'] .page-size select {
+  background: #101722;
+  border-color: #3b4b5e;
+  color: #e6edf7;
+}
+
+html[data-theme='dark'] .incidents-table th {
+  background: #202e3e;
+  color: #e6edf7;
+}
+
+html[data-theme='dark'] .incidents-table td {
+  border-bottom-color: #2b394a;
+}
+
+@media (max-width: 760px) {
+  .filter-row,
+  .filter-row + .filter-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .search-filter {
+    grid-column: 1 / -1;
+  }
+
+  .filter-row + .filter-row .filter-group:last-child {
+    grid-column: 1 / -1;
+  }
+
+  .filter-row + .filter-row .btn {
+    width: 100%;
+  }
+}
+
+@media (max-width: 480px) {
+  .incidents-page {
+    padding: 16px;
+  }
+
+  .filter-row,
+  .filter-row + .filter-row {
+    grid-template-columns: 1fr;
+  }
+
+  .search-filter,
+  .filter-row + .filter-row .filter-group:last-child {
+    grid-column: auto;
+  }
 }

@@ -60,6 +60,29 @@
   margin-bottom: 16px;
 }
 
+html,
+body,
+#root {
+  min-height: 100%;
+}
+
+body {
+  background: #f3f6fa;
+  color: #172033;
+  transition: background-color 180ms ease, color 180ms ease;
+}
+
+html[data-theme='dark'] body,
+html[data-theme='dark'] .app-container,
+html[data-theme='dark'] .main-content {
+  background-color: #101722;
+  color: #e6edf7;
+}
+
+html[data-theme='dark'] .main-content {
+  background-image: radial-gradient(ellipse at top, rgba(37, 99, 105, 0.15), transparent 60%);
+}
+
 /* Responsive layout helper */
 @media (max-width: 768px) {
   .main-content {

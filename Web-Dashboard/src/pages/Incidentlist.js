@@ -112,9 +112,11 @@ const IncidentList = () => {
       <section className="incidents-filters">
         <div className="filter-row">
           <div className="filter-group search-filter">
+            <label htmlFor="incident-search">Search</label>
             <i className="material-icons search-icon">search</i>
             <input
               type="text"
+              id="incident-search"
               name="searchQuery"
               value={filters.searchQuery}
               onChange={handleFilterChange}
